@@ -1,0 +1,3218 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Prediction Ledger</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+
+<style>
+  :root{
+    --slate-900:#0f1b16;
+    --slate-800:#16261f;
+    --slate-700:#1e352b;
+    --slate-600:#2b4638;
+    --chalk-line:#3d5c4b;
+    --chalk:#eef2ea;
+    --chalk-dim:#a9bdb0;
+    --gold:#d9a441;
+    --gold-dim:#8a6d2e;
+    --rust:#c05a42;
+    --rust-dim:#7d3d2c;
+    --radius:3px;
+    --font-display:'Fraunces', Georgia, serif;
+    --font-ui:'Inter', -apple-system, 'Segoe UI', sans-serif;
+    --font-num:'IBM Plex Mono', ui-monospace, 'Courier New', monospace;
+  }
+
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+
+  body{
+    background:
+      radial-gradient(ellipse at 20% -10%, rgba(217,164,65,0.06), transparent 45%),
+      var(--slate-900);
+    color:var(--chalk);
+    font-family:var(--font-ui);
+    line-height:1.6;
+    min-height:100vh;
+  }
+
+  .num{font-family:var(--font-num);}
+  a{color:inherit;}
+
+  ::selection{
+    background:var(--gold);
+    color:var(--slate-900);
+  }
+
+  .shell{
+    max-width:1180px;
+    margin:0 auto;
+    padding:22px 20px 80px;
+  }
+
+  header.top{
+    display:flex;
+    align-items:flex-end;
+    justify-content:space-between;
+    gap:16px;
+    padding-bottom:18px;
+    margin-bottom:22px;
+    border-bottom:1px solid var(--chalk-line);
+    flex-wrap:wrap;
+  }
+
+  header.top .brand h1{
+    margin:0;
+    font-family:var(--font-display);
+    font-size:27px;
+    font-weight:600;
+    letter-spacing:.2px;
+  }
+
+  header.top .brand p{
+    margin:4px 0 0;
+    color:var(--chalk-dim);
+    font-size:13.5px;
+  }
+
+  .top-actions{
+    display:flex;
+    align-items:center;
+    gap:10px;
+  }
+
+  .pill{
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+    border:1px solid var(--chalk-line);
+    border-radius:999px;
+    padding:5px 12px;
+    font-size:12.5px;
+    color:var(--chalk-dim);
+  }
+
+  .pill .dot{
+    width:7px;
+    height:7px;
+    border-radius:50%;
+    background:var(--chalk-dim);
+  }
+
+  .pill.live .dot{
+    background:var(--gold);
+  }
+
+  button{
+    font-family:inherit;
+    cursor:pointer;
+    border:1px solid var(--chalk-line);
+    background:var(--slate-800);
+    color:var(--chalk);
+    border-radius:var(--radius);
+    padding:9px 16px;
+    font-size:14px;
+    transition:border-color .15s ease, background .15s ease;
+  }
+
+  button:hover:not(:disabled){
+    border-color:var(--gold-dim);
+  }
+
+  button:focus-visible{
+    outline:2px solid var(--gold);
+    outline-offset:2px;
+  }
+
+  button:disabled{
+    opacity:.4;
+    cursor:not-allowed;
+  }
+
+  button.primary{
+    background:var(--gold);
+    color:var(--slate-900);
+    border-color:var(--gold);
+    font-weight:600;
+  }
+
+  button.primary:hover:not(:disabled){
+    background:#e6b658;
+  }
+
+  button.danger{
+    border-color:var(--rust-dim);
+    color:#e6a08c;
+  }
+
+  button.danger:hover:not(:disabled){
+    border-color:var(--rust);
+  }
+
+  button.ghost{
+    background:transparent;
+  }
+
+  button.small{
+    padding:5px 10px;
+    font-size:12.5px;
+  }
+
+  input,select{
+    font-family:inherit;
+    background:var(--slate-800);
+    color:var(--chalk);
+    border:1px solid var(--chalk-line);
+    border-radius:var(--radius);
+    padding:9px 11px;
+    font-size:14px;
+    width:100%;
+  }
+
+  input:focus,select:focus{
+    outline:2px solid var(--gold);
+    outline-offset:1px;
+  }
+
+  label{
+    display:block;
+    font-size:12.5px;
+    color:var(--chalk-dim);
+    margin-bottom:5px;
+  }
+
+  .field{
+    margin-bottom:14px;
+  }
+
+  .row2{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:12px;
+  }
+
+  .board{
+    display:grid;
+    grid-template-columns:340px 1fr;
+    gap:20px;
+    align-items:start;
+  }
+
+  @media (max-width:860px){
+    .board{
+      grid-template-columns:1fr;
+    }
+  }
+
+  .panel{
+    background:var(--slate-800);
+    border:1px solid var(--chalk-line);
+    border-radius:6px;
+    padding:18px;
+  }
+
+  .panel h2{
+    margin:0 0 14px;
+    font-size:15px;
+    font-weight:600;
+    color:var(--chalk-dim);
+  }
+
+  .market-row{
+    display:block;
+    width:100%;
+    text-align:left;
+    background:transparent;
+    border:1px solid transparent;
+    border-bottom:1px solid var(--chalk-line);
+    border-radius:0;
+    padding:12px 6px;
+    margin:0;
+  }
+
+  .market-row:first-child{
+    border-top:1px solid var(--chalk-line);
+  }
+
+  .market-row:hover{
+    background:var(--slate-700);
+  }
+
+  .market-row.active{
+    background:var(--slate-700);
+    border-color:var(--gold-dim);
+  }
+
+  .market-row .q{
+    font-size:13.5px;
+    margin-bottom:6px;
+  }
+
+  .market-row .meta{
+    display:flex;
+    justify-content:space-between;
+    font-size:11.5px;
+    color:var(--chalk-dim);
+  }
+
+  .status-tag{
+    font-size:10.5px;
+    padding:1px 7px;
+    border-radius:999px;
+    border:1px solid var(--chalk-line);
+  }
+
+  .status-tag.open{
+    color:var(--gold);
+    border-color:var(--gold-dim);
+  }
+
+  .status-tag.resolved{
+    color:#8fd0a8;
+    border-color:#3d6b4c;
+  }
+
+  .status-tag.void{
+    color:var(--chalk-dim);
+  }
+
+  .odds-board{
+    display:flex;
+    align-items:stretch;
+    gap:14px;
+    margin:18px 0 20px;
+  }
+
+  .odds-face{
+    flex:1;
+    border:1px solid var(--chalk-line);
+    border-radius:6px;
+    padding:16px;
+    text-align:center;
+    background:var(--slate-700);
+  }
+
+  .odds-face.yes{
+    border-color:var(--gold-dim);
+  }
+
+  .odds-face.no{
+    border-color:var(--rust-dim);
+  }
+
+  .odds-face .label{
+    font-size:12px;
+    color:var(--chalk-dim);
+    margin-bottom:6px;
+    letter-spacing:.3px;
+  }
+
+  .odds-face .pct{
+    font-size:38px;
+    font-weight:600;
+    font-family:var(--font-num);
+  }
+
+  .odds-face.yes .pct{
+    color:var(--gold);
+  }
+
+  .odds-face.no .pct{
+    color:var(--rust);
+  }
+
+  .odds-face .pool{
+    font-size:12px;
+    color:var(--chalk-dim);
+    margin-top:4px;
+  }
+
+  .bar{
+    height:6px;
+    border-radius:999px;
+    overflow:hidden;
+    background:var(--rust-dim);
+    margin-top:8px;
+  }
+
+  .bar > div{
+    height:100%;
+    background:var(--gold);
+  }
+
+  .kv{
+    display:flex;
+    justify-content:space-between;
+    padding:7px 0;
+    border-bottom:1px dashed var(--chalk-line);
+    font-size:13px;
+    gap:15px;
+  }
+
+  .kv:last-child{
+    border-bottom:none;
+  }
+
+  .kv .k{
+    color:var(--chalk-dim);
+  }
+
+  .tabs{
+    display:flex;
+    gap:6px;
+    margin-bottom:14px;
+    border-bottom:1px solid var(--chalk-line);
+  }
+
+  .tabs button{
+    border:none;
+    background:none;
+    border-radius:0;
+    padding:8px 4px;
+    margin-right:14px;
+    color:var(--chalk-dim);
+  }
+
+  .tabs button.active{
+    color:var(--gold);
+    border-bottom:2px solid var(--gold);
+  }
+
+  .empty{
+    color:var(--chalk-dim);
+    font-size:13px;
+    text-align:center;
+    padding:30px 10px;
+  }
+
+  .overlay{
+    position:fixed;
+    inset:0;
+    background:rgba(6,10,8,.7);
+    display:none;
+    align-items:center;
+    justify-content:center;
+    z-index:50;
+    padding:20px;
+  }
+
+  .overlay.show{
+    display:flex;
+  }
+
+  .modal{
+    background:var(--slate-800);
+    border:1px solid var(--chalk-line);
+    border-radius:8px;
+    padding:22px;
+    width:100%;
+    max-width:440px;
+    max-height:88vh;
+    overflow:auto;
+  }
+
+  .modal h3{
+    margin:0 0 16px;
+    font-family:var(--font-display);
+    font-size:18px;
+    font-weight:600;
+  }
+
+  .modal-actions{
+    display:flex;
+    gap:10px;
+    margin-top:18px;
+    justify-content:flex-start;
+  }
+
+  .toasts{
+    position:fixed;
+    bottom:16px;
+    left:16px;
+    z-index:60;
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+    max-width:360px;
+  }
+
+  .toast{
+    background:var(--slate-800);
+    border:1px solid var(--chalk-line);
+    border-left:3px solid var(--gold);
+    border-radius:5px;
+    padding:11px 14px;
+    font-size:13px;
+    box-shadow:0 6px 18px rgba(0,0,0,.35);
+  }
+
+  .toast.err{
+    border-left-color:var(--rust);
+  }
+
+  .toast.ok{
+    border-left-color:#5fae7c;
+  }
+
+  .toast .t-title{
+    font-weight:600;
+    margin-bottom:2px;
+  }
+
+  .toast .t-body{
+    color:var(--chalk-dim);
+    font-size:12px;
+    word-break:break-word;
+  }
+
+  .hint{
+    font-size:11.5px;
+    color:var(--chalk-dim);
+    margin-top:5px;
+  }
+
+  .divider{
+    height:1px;
+    background:var(--chalk-line);
+    margin:16px 0;
+  }
+
+  footer{
+    text-align:center;
+    color:var(--chalk-dim);
+    font-size:11.5px;
+    margin-top:40px;
+  }
+
+  details.debug{
+    margin-top:20px;
+  }
+
+  details.debug summary{
+    cursor:pointer;
+    color:var(--chalk-dim);
+    font-size:12px;
+  }
+
+  details.debug pre{
+    background:var(--slate-900);
+    border:1px solid var(--chalk-line);
+    border-radius:5px;
+    padding:10px;
+    font-size:11px;
+    max-height:220px;
+    overflow:auto;
+    text-align:left;
+  }
+
+  /* =========================================================
+     MARKET PRICE CHART
+     ========================================================= */
+
+  .market-chart-wrap{
+    display:grid;
+    grid-template-columns:minmax(0, 1fr) 250px;
+    gap:18px;
+    margin:18px 0 20px;
+    align-items:stretch;
+  }
+
+  @media (max-width:900px){
+    .market-chart-wrap{
+      grid-template-columns:1fr;
+    }
+  }
+
+  .price-chart-card{
+    background:var(--slate-900);
+    border:1px solid var(--chalk-line);
+    border-radius:6px;
+    padding:14px;
+    min-width:0;
+  }
+
+  .price-chart-head{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-start;
+    gap:12px;
+    margin-bottom:10px;
+  }
+
+  .price-chart-title{
+    font-size:13px;
+    color:var(--chalk-dim);
+  }
+
+  .price-chart-current{
+    font-family:var(--font-num);
+    font-size:18px;
+    color:var(--chalk);
+    font-weight:600;
+  }
+
+  .price-chart-sub{
+    font-size:11px;
+    color:var(--chalk-dim);
+    margin-top:2px;
+  }
+
+  .price-chart{
+    position:relative;
+    width:100%;
+    height:230px;
+    overflow:hidden;
+  }
+
+  .price-chart svg{
+    display:block;
+    width:100%;
+    height:100%;
+  }
+
+  .chart-grid-line{
+    stroke:var(--chalk-line);
+    stroke-width:1;
+    stroke-dasharray:3 5;
+    opacity:.65;
+  }
+
+  .chart-price-line{
+    fill:none;
+    stroke:var(--gold);
+    stroke-width:2.5;
+    vector-effect:non-scaling-stroke;
+  }
+
+  .chart-price-area{
+    fill:var(--gold);
+    opacity:.08;
+  }
+
+  .chart-threshold-line{
+    stroke:var(--rust);
+    stroke-width:1.5;
+    stroke-dasharray:6 5;
+    vector-effect:non-scaling-stroke;
+  }
+
+  .chart-label{
+    fill:var(--chalk-dim);
+    font-family:var(--font-num);
+    font-size:11px;
+  }
+
+  .chart-threshold-label{
+    fill:#e6a08c;
+    font-family:var(--font-num);
+    font-size:11px;
+  }
+
+  .chart-loading{
+    height:100%;
+    min-height:180px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    color:var(--chalk-dim);
+    font-size:12px;
+  }
+
+  .chart-error{
+    height:100%;
+    min-height:180px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    text-align:center;
+    color:var(--chalk-dim);
+    font-size:12px;
+    padding:20px;
+  }
+
+  .market-chart-stats{
+    display:flex;
+    flex-direction:column;
+    justify-content:center;
+    gap:0;
+  }
+
+  .chart-stat{
+    padding:10px 0;
+    border-bottom:1px dashed var(--chalk-line);
+  }
+
+  .chart-stat:last-child{
+    border-bottom:none;
+  }
+
+  .chart-stat .k{
+    color:var(--chalk-dim);
+    font-size:11px;
+    margin-bottom:3px;
+  }
+
+  .chart-stat .v{
+    font-family:var(--font-num);
+    font-size:14px;
+  }
+
+  .chart-stat.threshold .v{
+    color:var(--rust);
+  }
+
+  .chart-stat.asset .v{
+    color:var(--gold);
+  }
+</style>
+</head>
+
+<body>
+
+<div class="shell">
+
+  <header class="top">
+    <div class="brand">
+      <h1>Prediction Ledger</h1>
+      <p>YES/NO markets on BTC · ETH · SOL price thresholds — PredictionMarket contract</p>
+    </div>
+
+    <div class="top-actions">
+      <span id="netPill" class="pill">
+        <span class="dot"></span>
+        <span id="netLabel">Network not set</span>
+      </span>
+
+      <button id="settingsBtn" class="ghost small" title="Network configuration is fixed" style="display:none">
+        Settings
+      </button>
+
+      <button id="connectBtn" class="primary">
+        Connect Wallet
+      </button>
+    </div>
+  </header>
+
+  <div class="board">
+
+    <div class="panel">
+      <h2>Markets</h2>
+
+      <div style="display:flex; gap:8px; margin-bottom:12px;">
+        <button id="refreshBtn" class="ghost small" style="flex:1">
+          Refresh
+        </button>
+
+        <button id="newMarketBtn" class="small" style="flex:1">
+          New Market +
+        </button>
+      </div>
+
+      <div id="marketList">
+        <div class="empty">
+          Loading Prediction Ledger markets…
+        </div>
+      </div>
+    </div>
+
+    <div class="panel" id="mainPanel">
+      <div class="empty">
+        Select a market from the list, or create a new one.
+      </div>
+    </div>
+
+  </div>
+
+  <details class="debug">
+    <summary>Raw console (debug)</summary>
+    <pre id="debugLog">—</pre>
+  </details>
+
+  <footer>
+    Runs locally against GenLayer Studio · no data leaves your browser except calls to the configured RPC
+  </footer>
+
+</div>
+
+
+<!-- SETTINGS MODAL -->
+
+<div class="overlay" id="settingsOverlay">
+  <div class="modal">
+
+    <h3>Network Settings</h3>
+
+    <div class="field">
+      <label for="cfgAddress">PredictionMarket contract address</label>
+      <input id="cfgAddress" class="num" placeholder="0x...">
+    </div>
+
+    <div class="field">
+      <label for="cfgRpc">Local Studio RPC URL</label>
+      <input id="cfgRpc" class="num" placeholder="http://localhost:4000/api">
+    </div>
+
+    <div class="field">
+      <label for="cfgChainId">Chain ID</label>
+      <input id="cfgChainId" class="num" placeholder="61999">
+    </div>
+
+    <p class="hint">
+      Production network configuration is fixed for Prediction Ledger.
+    </p>
+
+    <div class="modal-actions">
+      <button id="cfgSave" class="primary">Save</button>
+      <button id="cfgClose" class="ghost">Close</button>
+    </div>
+
+  </div>
+</div>
+
+
+<!-- NEW MARKET MODAL -->
+
+<div class="overlay" id="newMarketOverlay">
+  <div class="modal">
+
+    <h3>Create a New Market</h3>
+
+    <div class="field">
+      <label for="nmQuestion">Market question</label>
+      <input
+        id="nmQuestion"
+        placeholder="e.g. Will BTC be above $70,000 by the deadline?"
+      >
+    </div>
+
+    <div class="row2">
+
+      <div class="field">
+        <label for="nmAsset">Asset</label>
+
+        <select id="nmAsset">
+          <option value="BTC">BTC</option>
+          <option value="ETH">ETH</option>
+          <option value="SOL">SOL</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label for="nmThreshold">Threshold price (USD)</label>
+
+        <input
+          id="nmThreshold"
+          class="num"
+          type="number"
+          step="any"
+          placeholder="65000"
+        />
+      </div>
+
+    </div>
+
+    <div class="field">
+      <label for="nmDeadline">Betting deadline</label>
+      <input id="nmDeadline" type="datetime-local">
+    </div>
+
+    <div class="field">
+      <label for="nmSource">Resolution source (CoinGecko only)</label>
+
+      <input id="nmSource" class="num" readonly>
+
+      <p class="hint">
+        Built automatically from the chosen asset — the contract only accepts the CoinGecko prefix.
+      </p>
+    </div>
+
+    <div class="modal-actions">
+      <button id="nmSubmit" class="primary">
+        Create Market
+      </button>
+
+      <button id="nmClose" class="ghost">
+        Cancel
+      </button>
+    </div>
+
+  </div>
+</div>
+
+
+<div class="toasts" id="toasts"></div>
+
+
+<script type="module">
+
+// =====================================================================
+// GenLayer
+// =====================================================================
+
+import { createClient } from "https://cdn.jsdelivr.net/npm/genlayer-js/+esm";
+import * as chains from "https://cdn.jsdelivr.net/npm/genlayer-js/chains/+esm";
+
+
+// =====================================================================
+// CONFIG
+// =====================================================================
+
+const GEN_DECIMALS = 18n;
+
+// Production configuration — fixed for Prediction Ledger.
+const FIXED_CONFIG = Object.freeze({
+  address: "0x97eCfbE5b74ABd4848B083b4EBf1443626c4c107",
+  rpc: "https://studio.genlayer.com/api",
+  chainId: "61999"
+});
+
+
+// =====================================================================
+// STATE
+// =====================================================================
+
+const state = {
+  cfg: loadConfig(),
+  address: null,
+  readClient: null,
+  writeClient: null,
+  markets: [],
+  activeId: null,
+  activeTab: "bet",
+};
+
+
+// =====================================================================
+// CONFIG HELPERS
+// =====================================================================
+
+function loadConfig() {
+  return { ...FIXED_CONFIG };
+}
+
+function saveConfig() {
+  state.cfg = { ...FIXED_CONFIG };
+}
+
+
+// =====================================================================
+// DEBUG LOG
+// =====================================================================
+
+function log(label, data) {
+
+  const el = document.getElementById("debugLog");
+
+  const line =
+    `[${new Date().toLocaleTimeString()}] ${label}\n${
+      typeof data === "string"
+        ? data
+        : JSON.stringify(
+            data,
+            (_, v) => typeof v === "bigint" ? v.toString() : v,
+            2
+          )
+    }`;
+
+  el.textContent =
+    (line + "\n\n" + el.textContent).slice(0, 8000);
+}
+
+
+// =====================================================================
+// TOAST
+// =====================================================================
+
+function toast(title, body, kind = "") {
+
+  const box = document.getElementById("toasts");
+
+  const el = document.createElement("div");
+
+  el.className = "toast " + kind;
+
+  el.innerHTML =
+    `<div class="t-title">${escapeHtml(title)}</div>` +
+    `<div class="t-body">${escapeHtml(body || "")}</div>`;
+
+  box.appendChild(el);
+
+  setTimeout(() => el.remove(), 9000);
+}
+
+
+function escapeHtml(s) {
+
+  return String(s).replace(
+    /[&<>"']/g,
+    c => ({
+      "&":"&amp;",
+      "<":"&lt;",
+      ">":"&gt;",
+      '"':"&quot;",
+      "'":"&#39;"
+    }[c])
+  );
+
+}
+
+
+// =====================================================================
+// CHAIN
+// =====================================================================
+
+function resolveChain() {
+
+  const base = chains.localnet || chains.studionet;
+
+  return {
+    ...base,
+
+    id: state.cfg.chainId
+      ? Number(state.cfg.chainId)
+      : base.id,
+
+    rpcUrls: state.cfg.rpc
+      ? {
+          default: {
+            http: [state.cfg.rpc]
+          },
+
+          public: {
+            http: [state.cfg.rpc]
+          }
+        }
+      : base.rpcUrls,
+  };
+}
+
+
+// =====================================================================
+// CONFIG CHECK
+// =====================================================================
+
+function ensureConfigured() {
+
+  if (!state.cfg.address) {
+
+    toast(
+      "Contract not configured",
+      "Set the contract address in Settings first.",
+      "err"
+    );
+
+    return false;
+  }
+
+  return true;
+}
+
+
+// =====================================================================
+// WALLET CONNECTION
+// =====================================================================
+
+async function connectWallet() {
+
+  if (!window.ethereum) {
+
+    toast(
+      "Wallet not found",
+      "MetaMask isn't installed or enabled.",
+      "err"
+    );
+
+    return;
+  }
+
+  try {
+
+    const [addr] =
+      await window.ethereum.request({
+        method: "eth_requestAccounts"
+      });
+
+    state.address = addr;
+
+    const chain = resolveChain();
+
+
+    // Read-only client
+    state.readClient = createClient({
+      chain
+    });
+
+
+    // Wallet client
+    state.writeClient = createClient({
+      chain,
+      account: addr,
+      provider: window.ethereum
+    });
+
+
+    // GenLayer wallet connection
+    await state.writeClient.connect("studionet");
+
+
+    document.getElementById("connectBtn").textContent =
+      shortAddr(addr);
+
+    document.getElementById("netPill").classList.add("live");
+
+    document.getElementById("netLabel").textContent =
+      `${chain.name || "GenLayer"} · #${chain.id}`;
+
+
+    log("wallet connected", {
+      addr,
+      chain
+    });
+
+
+    toast(
+      "Wallet connected",
+      shortAddr(addr),
+      "ok"
+    );
+
+
+    if (state.cfg.address) {
+      refreshMarkets();
+    }
+
+  } catch (e) {
+
+    log("connect error", String(e));
+
+    toast(
+      "Connection failed",
+      String(e.message || e),
+      "err"
+    );
+  }
+}
+
+
+// =====================================================================
+// ADDRESS
+// =====================================================================
+
+function shortAddr(a) {
+
+  return a
+    ? a.slice(0, 6) + "…" + a.slice(-4)
+    : "";
+}
+
+
+// =====================================================================
+// READ CLIENT
+// =====================================================================
+
+function getReadClient() {
+
+  if (state.readClient) {
+    return state.readClient;
+  }
+
+  const chain = resolveChain();
+
+  state.readClient =
+    createClient({ chain });
+
+  return state.readClient;
+}
+
+
+// =====================================================================
+// CONTRACT READ
+// =====================================================================
+
+async function callView(fn, args = []) {
+
+  const client = getReadClient();
+
+  const res =
+    await client.readContract({
+      address: state.cfg.address,
+      functionName: fn,
+      args,
+    });
+
+  log(
+    `view ${fn}(${args.join(", ")})`,
+    res
+  );
+
+  return res;
+}
+
+
+// =====================================================================
+// CONTRACT WRITE
+// =====================================================================
+
+async function callWrite(
+  fn,
+  args = [],
+  valueWei = 0n
+) {
+
+  if (!state.writeClient) {
+
+    await connectWallet();
+
+    if (!state.writeClient) {
+      throw new Error("wallet not connected");
+    }
+  }
+
+
+  // IMPORTANT:
+  // Do NOT pass account here.
+  // The account is already attached to createClient().
+  const payload = {
+    address: state.cfg.address,
+    functionName: fn,
+    args
+  };
+
+
+  if (valueWei > 0n) {
+    payload.value = valueWei;
+  }
+
+
+  log(
+    `write ${fn}(${args.join(", ")})`,
+    payload
+  );
+
+
+  const hash =
+    await state.writeClient.writeContract(
+      payload
+    );
+
+
+  toast(
+    "Transaction sent",
+    fn + " · waiting for confirmation…"
+  );
+
+
+  const receipt =
+    await state.writeClient.waitForTransactionReceipt({
+      hash
+    });
+
+
+  log(
+    `receipt ${fn}`,
+    receipt
+  );
+
+
+  return receipt;
+}
+
+
+// =====================================================================
+// VALUE HELPERS
+// =====================================================================
+
+function toWei(genAmountStr) {
+
+  const [
+    whole,
+    frac = ""
+  ] =
+    String(genAmountStr)
+      .trim()
+      .split(".");
+
+  const fracPadded =
+    (frac + "0".repeat(18))
+      .slice(0, 18);
+
+  return (
+    BigInt(whole || "0") *
+      (10n ** GEN_DECIMALS)
+    +
+    BigInt(fracPadded || "0")
+  );
+}
+
+
+function fromWei(weiStr) {
+
+  const w =
+    BigInt(weiStr || "0");
+
+  const base =
+    10n ** GEN_DECIMALS;
+
+  const whole =
+    w / base;
+
+  const frac =
+    (w % base)
+      .toString()
+      .padStart(18, "0")
+      .replace(/0+$/, "") || "0";
+
+  return `${whole}.${frac}`;
+}
+
+
+// =====================================================================
+// COINGECKO SOURCES
+// =====================================================================
+
+const COIN_SOURCE = {
+
+  BTC:
+    "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd",
+
+  ETH:
+    "https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd",
+
+  SOL:
+    "https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd",
+
+};
+
+
+// =====================================================================
+// BINANCE CHART CONFIG
+// =====================================================================
+
+const BINANCE_SYMBOL = {
+  BTC: "BTCUSDT",
+  ETH: "ETHUSDT",
+  SOL: "SOLUSDT"
+};
+
+
+// =====================================================================
+// PRICE CHART
+// =====================================================================
+
+async function loadPriceChart(asset, threshold) {
+
+  const chartEl =
+    document.getElementById("priceChart");
+
+  if (!chartEl) {
+    return;
+  }
+
+
+  chartEl.innerHTML =
+    `<div class="chart-loading">
+      Loading ${escapeHtml(asset)} price chart…
+    </div>`;
+
+
+  try {
+
+    const symbol =
+      BINANCE_SYMBOL[asset];
+
+    if (!symbol) {
+      throw new Error("Unsupported asset");
+    }
+
+
+    const url =
+      `https://api.binance.com/api/v3/klines` +
+      `?symbol=${symbol}` +
+      `&interval=1h` +
+      `&limit=24`;
+
+
+    const response =
+      await fetch(url);
+
+
+    if (!response.ok) {
+      throw new Error(
+        `Chart API returned ${response.status}`
+      );
+    }
+
+
+    const rows =
+      await response.json();
+
+
+    const points =
+      rows.map(row => ({
+        time: Number(row[0]),
+        price: Number(row[4])
+      }))
+      .filter(
+        p => Number.isFinite(p.price)
+      );
+
+
+    if (points.length < 2) {
+      throw new Error(
+        "Not enough price data"
+      );
+    }
+
+
+    renderPriceChart(
+      chartEl,
+      asset,
+      points,
+      Number(threshold)
+    );
+
+  } catch (e) {
+
+    log(
+      "price chart error",
+      String(e)
+    );
+
+
+    chartEl.innerHTML =
+      `<div class="chart-error">
+        Price chart unavailable right now.
+      </div>`;
+  }
+}
+
+
+function renderPriceChart(
+  container,
+  asset,
+  points,
+  threshold
+) {
+
+  const width = 760;
+  const height = 230;
+
+  const padLeft = 65;
+  const padRight = 14;
+  const padTop = 18;
+  const padBottom = 28;
+
+  const chartWidth =
+    width - padLeft - padRight;
+
+  const chartHeight =
+    height - padTop - padBottom;
+
+
+  const prices =
+    points.map(p => p.price);
+
+
+  let minPrice =
+    Math.min(...prices, threshold);
+
+  let maxPrice =
+    Math.max(...prices, threshold);
+
+
+  if (!Number.isFinite(minPrice) ||
+      !Number.isFinite(maxPrice)) {
+
+    throw new Error(
+      "Invalid chart values"
+    );
+  }
+
+
+  let range =
+    maxPrice - minPrice;
+
+
+  if (range === 0) {
+    range =
+      Math.max(
+        Math.abs(maxPrice) * 0.01,
+        1
+      );
+  }
+
+
+  const padding =
+    range * 0.12;
+
+
+  minPrice -= padding;
+  maxPrice += padding;
+
+
+  const scaleX =
+    i =>
+      padLeft +
+      (i / (points.length - 1)) *
+      chartWidth;
+
+
+  const scaleY =
+    price =>
+      padTop +
+      (1 -
+        (price - minPrice) /
+        (maxPrice - minPrice)
+      ) *
+      chartHeight;
+
+
+  const linePoints =
+    points
+      .map(
+        (p, i) =>
+          `${scaleX(i).toFixed(2)},${scaleY(p.price).toFixed(2)}`
+      )
+      .join(" ");
+
+
+  const areaPoints =
+    `${padLeft},${padTop + chartHeight} ` +
+    linePoints +
+    ` ${scaleX(points.length - 1)},${padTop + chartHeight}`;
+
+
+  const thresholdY =
+    scaleY(threshold);
+
+
+  const latest =
+    points[points.length - 1].price;
+
+
+  const previous =
+    points.length > 1
+      ? points[points.length - 2].price
+      : latest;
+
+
+  const change =
+    previous
+      ? ((latest - previous) / previous) * 100
+      : 0;
+
+
+  const changeText =
+    `${change >= 0 ? "+" : ""}${change.toFixed(2)}%`;
+
+
+  const formatPrice =
+    value =>
+      "$" +
+      Number(value).toLocaleString(
+        "en-US",
+        {
+          maximumFractionDigits:
+            value >= 100
+              ? 2
+              : 4
+        }
+      );
+
+
+  const yTicks =
+    [0, .25, .5, .75, 1];
+
+
+  const grid =
+    yTicks
+      .map(t => {
+
+        const price =
+          maxPrice -
+          t * (maxPrice - minPrice);
+
+        const y =
+          padTop +
+          t * chartHeight;
+
+        return `
+          <line
+            x1="${padLeft}"
+            y1="${y}"
+            x2="${width - padRight}"
+            y2="${y}"
+            class="chart-grid-line"
+          />
+
+          <text
+            x="${padLeft - 8}"
+            y="${y + 4}"
+            text-anchor="end"
+            class="chart-label"
+          >
+            ${escapeHtml(formatPrice(price))}
+          </text>
+        `;
+      })
+      .join("");
+
+
+  const firstTime =
+    new Date(
+      points[0].time
+    ).toLocaleTimeString(
+      [],
+      {
+        hour:"2-digit",
+        minute:"2-digit"
+      }
+    );
+
+
+  const lastTime =
+    new Date(
+      points[points.length - 1].time
+    ).toLocaleTimeString(
+      [],
+      {
+        hour:"2-digit",
+        minute:"2-digit"
+      }
+    );
+
+
+  const thresholdLabelY =
+    Math.max(
+      padTop + 13,
+      Math.min(
+        height - padBottom - 5,
+        thresholdY - 7
+      )
+    );
+
+
+  container.innerHTML = `
+
+    <div class="price-chart-head">
+
+      <div>
+        <div class="price-chart-title">
+          ${escapeHtml(asset)} price · last 24h
+        </div>
+
+        <div class="price-chart-sub">
+          Binance market data
+        </div>
+      </div>
+
+      <div style="text-align:right;">
+
+        <div class="price-chart-current">
+          ${escapeHtml(formatPrice(latest))}
+        </div>
+
+        <div
+          class="price-chart-sub"
+          style="
+            color:${
+              change >= 0
+                ? "var(--gold)"
+                : "var(--rust)"
+            };
+          "
+        >
+          ${changeText} vs previous hour
+        </div>
+
+      </div>
+
+    </div>
+
+
+    <div class="price-chart">
+
+      <svg
+        viewBox="0 0 ${width} ${height}"
+        preserveAspectRatio="none"
+        aria-label="${escapeHtml(asset)} price chart"
+      >
+
+        ${grid}
+
+
+        <polygon
+          points="${areaPoints}"
+          class="chart-price-area"
+        />
+
+
+        <line
+          x1="${padLeft}"
+          y1="${thresholdY}"
+          x2="${width - padRight}"
+          y2="${thresholdY}"
+          class="chart-threshold-line"
+        />
+
+
+        <text
+          x="${width - padRight - 2}"
+          y="${thresholdLabelY}"
+          text-anchor="end"
+          class="chart-threshold-label"
+        >
+          Threshold ${escapeHtml(formatPrice(threshold))}
+        </text>
+
+
+        <polyline
+          points="${linePoints}"
+          class="chart-price-line"
+        />
+
+
+        <circle
+          cx="${scaleX(points.length - 1)}"
+          cy="${scaleY(latest)}"
+          r="4"
+          fill="var(--gold)"
+        />
+
+
+        <text
+          x="${padLeft}"
+          y="${height - 7}"
+          class="chart-label"
+        >
+          ${escapeHtml(firstTime)}
+        </text>
+
+
+        <text
+          x="${width - padRight}"
+          y="${height - 7}"
+          text-anchor="end"
+          class="chart-label"
+        >
+          ${escapeHtml(lastTime)}
+        </text>
+
+      </svg>
+
+    </div>
+  `;
+
+
+  const stats =
+    document.getElementById("chartStats");
+
+  if (stats) {
+
+    const distance =
+      threshold !== 0
+        ? ((latest - threshold) / threshold) * 100
+        : 0;
+
+
+    stats.innerHTML = `
+
+      <div class="chart-stat asset">
+
+        <div class="k">
+          Current ${escapeHtml(asset)} price
+        </div>
+
+        <div class="v">
+          ${escapeHtml(formatPrice(latest))}
+        </div>
+
+      </div>
+
+
+      <div class="chart-stat threshold">
+
+        <div class="k">
+          Market threshold
+        </div>
+
+        <div class="v">
+          ${escapeHtml(formatPrice(threshold))}
+        </div>
+
+      </div>
+
+
+      <div class="chart-stat">
+
+        <div class="k">
+          Distance from threshold
+        </div>
+
+        <div
+          class="v"
+          style="
+            color:${
+              distance >= 0
+                ? "var(--gold)"
+                : "var(--rust)"
+            };
+          "
+        >
+          ${distance >= 0 ? "+" : ""}
+          ${distance.toFixed(2)}%
+        </div>
+
+      </div>
+
+
+      <div class="chart-stat">
+
+        <div class="k">
+          Data window
+        </div>
+
+        <div class="v">
+          24 hours
+        </div>
+
+      </div>
+
+    `;
+  }
+}
+
+
+// =====================================================================
+// SETTINGS
+// =====================================================================
+
+function openSettings() {
+
+  document.getElementById("cfgAddress").value =
+    state.cfg.address || "";
+
+  document.getElementById("cfgRpc").value =
+    state.cfg.rpc || "";
+
+  document.getElementById("cfgChainId").value =
+    state.cfg.chainId || "";
+
+  document
+    .getElementById("settingsOverlay")
+    .classList.add("show");
+}
+
+
+function closeSettings() {
+
+  document
+    .getElementById("settingsOverlay")
+    .classList.remove("show");
+}
+
+
+document.getElementById("settingsBtn").onclick =
+  openSettings;
+
+
+document.getElementById("cfgClose").onclick =
+  closeSettings;
+
+
+document.getElementById("cfgSave").onclick = () => {
+
+  const cfg = {
+
+    address:
+      document
+        .getElementById("cfgAddress")
+        .value
+        .trim(),
+
+    rpc:
+      document
+        .getElementById("cfgRpc")
+        .value
+        .trim(),
+
+    chainId:
+      document
+        .getElementById("cfgChainId")
+        .value
+        .trim(),
+
+  };
+
+
+  saveConfig(cfg);
+
+  state.readClient = null;
+  state.writeClient = null;
+
+  closeSettings();
+
+  toast(
+    "Settings saved",
+    ""
+  );
+
+
+  if (cfg.address) {
+    refreshMarkets();
+  }
+};
+
+
+// =====================================================================
+// BUTTONS
+// =====================================================================
+
+document.getElementById("connectBtn").onclick =
+  connectWallet;
+
+
+document.getElementById("refreshBtn").onclick =
+  () =>
+    ensureConfigured() &&
+    refreshMarkets();
+
+
+document.getElementById("newMarketBtn").onclick =
+  () => {
+
+    if (!ensureConfigured()) {
+      return;
+    }
+
+    document
+      .getElementById("newMarketOverlay")
+      .classList.add("show");
+  };
+
+
+document.getElementById("nmClose").onclick =
+  () =>
+    document
+      .getElementById("newMarketOverlay")
+      .classList.remove("show");
+
+
+// =====================================================================
+// NEW MARKET SOURCE
+// =====================================================================
+
+document.getElementById("nmAsset").onchange =
+  updateSourcePreview;
+
+
+updateSourcePreview();
+
+
+function updateSourcePreview() {
+
+  const asset =
+    document.getElementById("nmAsset").value;
+
+  document.getElementById("nmSource").value =
+    COIN_SOURCE[asset];
+}
+
+
+// =====================================================================
+// CREATE MARKET
+// =====================================================================
+
+document.getElementById("nmSubmit").onclick =
+  async () => {
+
+    const question =
+      document
+        .getElementById("nmQuestion")
+        .value
+        .trim();
+
+    const asset =
+      document.getElementById("nmAsset").value;
+
+    const threshold =
+      document
+        .getElementById("nmThreshold")
+        .value
+        .trim();
+
+    const deadlineLocal =
+      document
+        .getElementById("nmDeadline")
+        .value;
+
+    const source =
+      document
+        .getElementById("nmSource")
+        .value;
+
+
+    if (!question || question.length < 5) {
+
+      return toast(
+        "Question too short",
+        "Minimum 5 characters.",
+        "err"
+      );
+    }
+
+
+    if (
+      !threshold ||
+      Number(threshold) <= 0
+    ) {
+
+      return toast(
+        "Invalid threshold",
+        "",
+        "err"
+      );
+    }
+
+
+    if (!deadlineLocal) {
+
+      return toast(
+        "Pick a deadline",
+        "",
+        "err"
+      );
+    }
+
+
+    const deadlineEpoch =
+      Math.floor(
+        new Date(deadlineLocal).getTime() / 1000
+      );
+
+
+    if (
+      deadlineEpoch <=
+      Math.floor(Date.now() / 1000)
+    ) {
+
+      return toast(
+        "Deadline must be in the future",
+        "",
+        "err"
+      );
+    }
+
+
+    const btn =
+      document.getElementById("nmSubmit");
+
+    btn.disabled = true;
+    btn.textContent = "Sending…";
+
+
+    try {
+
+      await callWrite(
+        "create_market",
+        [
+          question,
+          asset,
+          String(threshold),
+          String(deadlineEpoch),
+          source
+        ]
+      );
+
+
+      toast(
+        "Market created",
+        question,
+        "ok"
+      );
+
+
+      document
+        .getElementById("newMarketOverlay")
+        .classList.remove("show");
+
+
+      await refreshMarkets();
+
+    } catch (e) {
+
+      log(
+        "create_market error",
+        String(e)
+      );
+
+
+      toast(
+        "Failed to create market",
+        String(e.message || e),
+        "err"
+      );
+
+    } finally {
+
+      btn.disabled = false;
+      btn.textContent = "Create Market";
+
+    }
+
+  };
+
+
+// =====================================================================
+// MODAL BACKDROP
+// =====================================================================
+
+for (
+  const id of [
+    "settingsOverlay",
+    "newMarketOverlay"
+  ]
+) {
+
+  document
+    .getElementById(id)
+    .addEventListener(
+      "click",
+      (e) => {
+
+        if (e.target.id === id) {
+          e.currentTarget.classList.remove("show");
+        }
+
+      }
+    );
+}
+
+
+// =====================================================================
+// REFRESH MARKETS
+// =====================================================================
+
+async function refreshMarkets() {
+
+  const listEl =
+    document.getElementById("marketList");
+
+  listEl.innerHTML =
+    `<div class="empty">Loading…</div>`;
+
+
+  try {
+
+    const idsRaw =
+      await callView("list_markets");
+
+
+    const ids =
+      JSON.parse(idsRaw || "[]");
+
+
+    if (!ids.length) {
+
+      listEl.innerHTML =
+        `<div class="empty">No markets created yet.</div>`;
+
+      state.markets = [];
+
+      return;
+    }
+
+
+    const markets =
+      await Promise.all(
+        ids.map(
+          async id => {
+
+            try {
+
+              return JSON.parse(
+                await callView(
+                  "get_market",
+                  [id]
+                )
+              );
+
+            } catch {
+
+              return null;
+            }
+          }
+        )
+      );
+
+
+    state.markets =
+      markets
+        .filter(Boolean)
+        .reverse();
+
+
+    renderMarketList();
+
+
+    if (state.activeId) {
+
+      const still =
+        state.markets.find(
+          m => m.id === state.activeId
+        );
+
+
+      if (still) {
+        renderMarketDetail(still.id);
+      }
+    }
+
+  } catch (e) {
+
+    log(
+      "refreshMarkets error",
+      String(e)
+    );
+
+
+    listEl.innerHTML =
+      `<div class="empty">
+        Failed to read the contract.
+        Check the address/RPC in Settings.
+      </div>`;
+
+
+    toast(
+      "Failed to load markets",
+      String(e.message || e),
+      "err"
+    );
+  }
+}
+
+
+// =====================================================================
+// MARKET LIST
+// =====================================================================
+
+function renderMarketList() {
+
+  const listEl =
+    document.getElementById("marketList");
+
+
+  if (!state.markets.length) {
+
+    listEl.innerHTML =
+      `<div class="empty">No markets found.</div>`;
+
+    return;
+  }
+
+
+  listEl.innerHTML = "";
+
+
+  for (const m of state.markets) {
+
+    const row =
+      document.createElement("button");
+
+
+    row.className =
+      "market-row" +
+      (
+        m.id === state.activeId
+          ? " active"
+          : ""
+      );
+
+
+    const statusLabel = {
+
+      open: "Open",
+      resolved: "Resolved",
+      void: "Void"
+
+    }[m.status] || m.status;
+
+
+    row.innerHTML = `
+
+      <div class="q">
+        #${m.id} · ${escapeHtml(m.question)}
+      </div>
+
+      <div class="meta">
+
+        <span>
+          ${m.asset} @ $${escapeHtml(m.threshold)}
+        </span>
+
+        <span class="status-tag ${m.status}">
+          ${statusLabel}
+        </span>
+
+      </div>
+    `;
+
+
+    row.onclick =
+      () => renderMarketDetail(m.id);
+
+
+    listEl.appendChild(row);
+  }
+}
+
+
+// =====================================================================
+// MARKET DETAIL
+// =====================================================================
+
+async function renderMarketDetail(id) {
+
+  state.activeId = id;
+
+  renderMarketList();
+
+
+  const main =
+    document.getElementById("mainPanel");
+
+
+  main.innerHTML =
+    `<div class="empty">
+      Loading market #${id}…
+    </div>`;
+
+
+  try {
+
+    const market =
+      JSON.parse(
+        await callView(
+          "get_market",
+          [id]
+        )
+      );
+
+
+    const odds =
+      JSON.parse(
+        await callView(
+          "get_odds",
+          [id]
+        )
+      );
+
+
+    let position = {
+      yes: "0",
+      no: "0"
+    };
+
+
+    let claimed = false;
+
+
+    if (state.address) {
+
+      try {
+
+        position =
+          JSON.parse(
+            await callView(
+              "get_position",
+              [
+                id,
+                state.address
+              ]
+            )
+          );
+
+      } catch {}
+
+
+      try {
+
+        claimed =
+          (
+            await callView(
+              "has_claimed",
+              [
+                id,
+                state.address
+              ]
+            )
+          ) === "true";
+
+      } catch {}
+    }
+
+
+    const now =
+      Math.floor(
+        Date.now() / 1000
+      );
+
+
+    const deadline =
+      Number(market.deadline);
+
+
+    const past =
+      now >= deadline;
+
+
+    const yesPct =
+      (
+        Number(odds.yes_bps) / 100
+      ).toFixed(1);
+
+
+    const noPct =
+      (
+        Number(odds.no_bps) / 100
+      ).toFixed(1);
+
+
+    const statusLabel = {
+
+      open: "Open",
+      resolved: "Resolved",
+      void: "Void"
+
+    }[market.status] || market.status;
+
+
+    main.innerHTML = `
+
+      <div style="
+        display:flex;
+        justify-content:space-between;
+        align-items:flex-start;
+        gap:12px;
+        margin-bottom:6px;
+      ">
+
+        <h2 style="
+          color:var(--chalk);
+          font-family:var(--font-display);
+          font-size:19px;
+          font-weight:600;
+          margin:0;
+        ">
+          #${market.id} · ${escapeHtml(market.question)}
+        </h2>
+
+        <span class="status-tag ${market.status}">
+          ${statusLabel}
+        </span>
+
+      </div>
+
+
+      <p class="hint" style="margin-bottom:18px;">
+
+        ${market.asset}
+        must ${past ? "have crossed" : "cross"}
+        $<span class="num">
+          ${escapeHtml(market.threshold)}
+        </span>
+        by ${fmtDate(deadline)}
+        —
+        ${
+          past
+            ? "deadline passed"
+            : "time left: " +
+              fmtRemaining(deadline - now)
+        }
+
+      </p>
+
+
+      <!-- =========================================================
+           MARKET PRICE CHART
+           ========================================================= -->
+
+      <div class="market-chart-wrap">
+
+        <div class="price-chart-card">
+
+          <div id="priceChart">
+
+            <div class="chart-loading">
+              Loading ${escapeHtml(market.asset)} price chart…
+            </div>
+
+          </div>
+
+        </div>
+
+
+        <div
+          class="price-chart-card market-chart-stats"
+          id="chartStats"
+        >
+
+          <div class="chart-stat asset">
+
+            <div class="k">
+              Asset
+            </div>
+
+            <div class="v">
+              ${escapeHtml(market.asset)}
+            </div>
+
+          </div>
+
+
+          <div class="chart-stat threshold">
+
+            <div class="k">
+              Threshold
+            </div>
+
+            <div class="v">
+              $${escapeHtml(market.threshold)}
+            </div>
+
+          </div>
+
+
+          <div class="chart-stat">
+
+            <div class="k">
+              Chart period
+            </div>
+
+            <div class="v">
+              24 hours
+            </div>
+
+          </div>
+
+        </div>
+
+      </div>
+
+
+      <div class="odds-board">
+
+        <div class="odds-face yes">
+
+          <div class="label">
+            YES
+          </div>
+
+          <div class="pct num">
+            ${yesPct}%
+          </div>
+
+          <div class="pool num">
+            ${fromWei(odds.yes_pool)} GEN
+          </div>
+
+        </div>
+
+
+        <div class="odds-face no">
+
+          <div class="label">
+            NO
+          </div>
+
+          <div class="pct num">
+            ${noPct}%
+          </div>
+
+          <div class="pool num">
+            ${fromWei(odds.no_pool)} GEN
+          </div>
+
+        </div>
+
+      </div>
+
+
+      <div class="bar">
+        <div style="width:${yesPct}%"></div>
+      </div>
+
+
+      <div class="divider"></div>
+
+
+      <div class="tabs">
+
+        <button
+          data-tab="bet"
+          class="${state.activeTab === "bet" ? "active" : ""}"
+        >
+          Place Bet
+        </button>
+
+        <button
+          data-tab="manage"
+          class="${state.activeTab === "manage" ? "active" : ""}"
+        >
+          My Position / Resolve
+        </button>
+
+        <button
+          data-tab="info"
+          class="${state.activeTab === "info" ? "active" : ""}"
+        >
+          Details
+        </button>
+
+      </div>
+
+
+      <div id="tabBody"></div>
+    `;
+
+
+    // Load chart independently.
+    // A chart failure must never break the contract UI.
+    loadPriceChart(
+      market.asset,
+      market.threshold
+    );
+
+
+    main
+      .querySelectorAll(".tabs button")
+      .forEach(
+        b =>
+          b.onclick = () => {
+
+            state.activeTab =
+              b.dataset.tab;
+
+            renderMarketDetail(id);
+          }
+      );
+
+
+    const body =
+      main.querySelector("#tabBody");
+
+
+    // ================================================================
+    // BET TAB
+    // ================================================================
+
+    if (state.activeTab === "bet") {
+
+      body.innerHTML = `
+
+        <div class="field">
+
+          <label>
+            Side
+          </label>
+
+          <div class="row2">
+
+            <button id="betYes" class="small">
+              YES
+            </button>
+
+            <button id="betNo" class="small">
+              NO
+            </button>
+
+          </div>
+
+        </div>
+
+
+        <div class="field">
+
+          <label for="betAmount">
+            Amount (GEN)
+          </label>
+
+          <input
+            id="betAmount"
+            class="num"
+            type="number"
+            step="any"
+            min="0"
+            placeholder="0.01"
+          >
+
+        </div>
+
+
+        <button
+          id="betSubmit"
+          class="primary"
+          ${past || market.status !== "open" ? "disabled" : ""}
+        >
+          Place Bet
+        </button>
+
+
+        ${
+          past || market.status !== "open"
+            ? `
+              <p class="hint">
+                This market is no longer open for betting.
+              </p>
+            `
+            : ""
+        }
+
+      `;
+
+
+      let side = "YES";
+
+
+      const yesBtn =
+        body.querySelector("#betYes");
+
+      const noBtn =
+        body.querySelector("#betNo");
+
+
+      const paint = () => {
+
+        yesBtn.style.borderColor =
+          side === "YES"
+            ? "var(--gold)"
+            : "";
+
+        noBtn.style.borderColor =
+          side === "NO"
+            ? "var(--rust)"
+            : "";
+      };
+
+
+      yesBtn.onclick = () => {
+
+        side = "YES";
+
+        paint();
+      };
+
+
+      noBtn.onclick = () => {
+
+        side = "NO";
+
+        paint();
+      };
+
+
+      paint();
+
+
+      body
+        .querySelector("#betSubmit")
+        .onclick =
+        async (e) => {
+
+          const amt =
+            body
+              .querySelector("#betAmount")
+              .value;
+
+
+          if (
+            !amt ||
+            Number(amt) <= 0
+          ) {
+
+            return toast(
+              "Invalid amount",
+              "",
+              "err"
+            );
+          }
+
+
+          e.target.disabled = true;
+          e.target.textContent = "Sending…";
+
+
+          try {
+
+            await callWrite(
+              "place_bet",
+              [
+                id,
+                side
+              ],
+              toWei(amt)
+            );
+
+
+            toast(
+              "Bet placed",
+              `${side} · ${amt} GEN`,
+              "ok"
+            );
+
+
+            await refreshMarkets();
+
+          } catch (err) {
+
+            toast(
+              "Bet failed",
+              String(
+                err.message || err
+              ),
+              "err"
+            );
+
+          } finally {
+
+            e.target.disabled = false;
+            e.target.textContent =
+              "Place Bet";
+          }
+
+        };
+    }
+
+
+    // ================================================================
+    // MANAGE TAB
+    // ================================================================
+
+    if (state.activeTab === "manage") {
+
+      const myYes =
+        fromWei(position.yes);
+
+      const myNo =
+        fromWei(position.no);
+
+
+      const canResolve =
+        past &&
+        market.status === "open";
+
+
+      const canClaim =
+        (
+          market.status === "resolved" ||
+          market.status === "void"
+        ) &&
+        !claimed &&
+        (
+          Number(position.yes) +
+          Number(position.no) > 0
+        );
+
+
+      const canVoid =
+        past &&
+        market.status === "open" &&
+        now >=
+        Number(
+          market.void_after || Infinity
+        );
+
+
+      body.innerHTML = `
+
+        <div class="kv">
+
+          <span class="k">
+            My position (YES)
+          </span>
+
+          <span class="num">
+            ${myYes} GEN
+          </span>
+
+        </div>
+
+
+        <div class="kv">
+
+          <span class="k">
+            My position (NO)
+          </span>
+
+          <span class="num">
+            ${myNo} GEN
+          </span>
+
+        </div>
+
+
+        ${
+          market.status === "resolved"
+            ? `
+              <div class="kv">
+
+                <span class="k">
+                  Outcome
+                </span>
+
+                <span class="num">
+                  ${market.outcome}
+                </span>
+
+              </div>
+            `
+            : ""
+        }
+
+
+        <div class="divider"></div>
+
+
+        <div style="
+          display:flex;
+          gap:10px;
+          flex-wrap:wrap;
+        ">
+
+          <button
+            id="resolveBtn"
+            ${canResolve ? "" : "disabled"}
+          >
+            Resolve Market
+          </button>
+
+
+          <button
+            id="voidBtn"
+            class="danger"
+            ${canVoid ? "" : "disabled"}
+          >
+            Void (after grace period)
+          </button>
+
+
+          <button
+            id="claimBtn"
+            class="primary"
+            ${canClaim ? "" : "disabled"}
+          >
+            ${claimed ? "Already claimed" : "Claim Payout"}
+          </button>
+
+        </div>
+
+
+        ${
+          !state.address
+            ? `
+              <p class="hint">
+                Connect a wallet to bet or claim.
+              </p>
+            `
+            : ""
+        }
+
+      `;
+
+
+      const wire =
+        (
+          elId,
+          fn,
+          args,
+          label
+        ) => {
+
+          const el =
+            body.querySelector(elId);
+
+
+          if (!el) {
+            return;
+          }
+
+
+          el.onclick =
+            async () => {
+
+              el.disabled = true;
+
+              const old =
+                el.textContent;
+
+              el.textContent =
+                "Sending…";
+
+
+              try {
+
+                await callWrite(
+                  fn,
+                  args
+                );
+
+
+                toast(
+                  label + " succeeded",
+                  ""
+                );
+
+
+                await refreshMarkets();
+
+              } catch (err) {
+
+                toast(
+                  label + " failed",
+                  String(
+                    err.message || err
+                  ),
+                  "err"
+                );
+
+              } finally {
+
+                el.disabled = false;
+                el.textContent = old;
+
+              }
+
+            };
+        };
+
+
+      wire(
+        "#resolveBtn",
+        "resolve_market",
+        [id],
+        "Resolve"
+      );
+
+
+      wire(
+        "#voidBtn",
+        "void_market",
+        [id],
+        "Void"
+      );
+
+
+      wire(
+        "#claimBtn",
+        "claim",
+        [id],
+        "Claim"
+      );
+    }
+
+
+    // ================================================================
+    // INFO TAB
+    // ================================================================
+
+    if (state.activeTab === "info") {
+
+      body.innerHTML = `
+
+        <div class="kv">
+
+          <span class="k">
+            Creator
+          </span>
+
+          <span class="num">
+            ${shortAddr(market.creator)}
+          </span>
+
+        </div>
+
+
+        <div class="kv">
+
+          <span class="k">
+            Resolution source
+          </span>
+
+          <span
+            class="num"
+            style="word-break:break-all;"
+          >
+            ${escapeHtml(market.resolution_source)}
+          </span>
+
+        </div>
+
+
+        <div class="kv">
+
+          <span class="k">
+            Created
+          </span>
+
+          <span class="num">
+            ${fmtDate(Number(market.created_at))}
+          </span>
+
+        </div>
+
+
+        <div class="kv">
+
+          <span class="k">
+            Deadline
+          </span>
+
+          <span class="num">
+            ${fmtDate(deadline)}
+          </span>
+
+        </div>
+
+
+        ${
+          market.resolved_price
+            ? `
+              <div class="kv">
+
+                <span class="k">
+                  Resolved price
+                </span>
+
+                <span class="num">
+                  $${escapeHtml(market.resolved_price)}
+                </span>
+
+              </div>
+            `
+            : ""
+        }
+
+
+        ${
+          market.resolved_at
+            ? `
+              <div class="kv">
+
+                <span class="k">
+                  Resolved at
+                </span>
+
+                <span class="num">
+                  ${fmtDate(Number(market.resolved_at))}
+                </span>
+
+              </div>
+            `
+            : ""
+        }
+
+      `;
+    }
+
+  } catch (e) {
+
+    log(
+      "renderMarketDetail error",
+      String(e)
+    );
+
+
+    main.innerHTML =
+      `<div class="empty">
+        Failed to load market #${id}.
+      </div>`;
+  }
+}
+
+
+// =====================================================================
+// DATE HELPERS
+// =====================================================================
+
+function fmtDate(epoch) {
+
+  if (!epoch) {
+    return "—";
+  }
+
+  return new Date(
+    epoch * 1000
+  ).toLocaleString();
+}
+
+
+function fmtRemaining(sec) {
+
+  if (sec <= 0) {
+    return "ended";
+  }
+
+
+  const d =
+    Math.floor(sec / 86400);
+
+  const h =
+    Math.floor(
+      (sec % 86400) / 3600
+    );
+
+  const m =
+    Math.floor(
+      (sec % 3600) / 60
+    );
+
+
+  return [
+
+    d ? `${d}d` : "",
+
+    h ? `${h}h` : "",
+
+    m ? `${m}m` : ""
+
+  ]
+    .filter(Boolean)
+    .join(" ") ||
+    "under a minute";
+}
+
+
+// =====================================================================
+// INITIAL LOAD
+// =====================================================================
+
+document.getElementById("netLabel").textContent =
+  "GenLayer Studio · #61999";
+
+refreshMarkets();
+
+
+// =====================================================================
+// AUTO REFRESH
+// =====================================================================
+
+setInterval(
+  () => {
+
+    if (state.cfg.address) {
+      refreshMarkets();
+    }
+
+  },
+  30000
+);
+
+</script>
+
+</body>
+</html>
