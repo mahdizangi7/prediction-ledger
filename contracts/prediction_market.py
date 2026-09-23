@@ -1,25 +1,19 @@
 # { "Depends": "py-genlayer:1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6" }
 
-# PredictionMarket - pari-mutuel YES/NO markets on a USD price threshold.
-#
-# Money is real GEN held in escrow by this contract, in wei, as int.
-# No floats touch storage or calldata.
-
 from genlayer import *
 
 import json
 import datetime
 
 
-# ---------------------------------------------------------------------
+# ============================================================
 # CONFIG
-# ---------------------------------------------------------------------
+# ============================================================
 
-# Anyone can create a market, so the resolution source must be pinned to
-# hosts the contract trusts. Without this the market creator can point at
-# a URL they control and mint whatever outcome they like.
-ALLOWED_SOURCE_PREFIXES = (
-    "https://api.coingecko.com/api/v3/simple/price",
+ALLOWED_ASSETS = (
+    "BTC",
+    "ETH",
+    "SOL",
 )
 
 COIN_IDS = {
@@ -28,24 +22,33 @@ COIN_IDS = {
     "SOL": "solana",
 }
 
-# Resolution band. If the price lands within this distance of the
-# threshold, the round returns UNRESOLVED instead of a coin flip.
-# Leader and validator fetch seconds apart; without a band a price
-# sitting on the threshold deadlocks the market forever.
-BAND_RATIO = 0.005          # 0.5% of threshold
+DISPLAY_NAMES = {
+    "BTC": "Bitcoin",
+    "ETH": "Ethereum",
+    "SOL": "Solana",
+}
+
+# Historical window around the exact market deadline.
+EVIDENCE_WINDOW_SECONDS = 24 * 60 * 60
+
+# The selected historical observation must still be
+# reasonably close to the exact deadline.
+MAX_OBSERVATION_DISTANCE_SECONDS = 3600
+
+# Independent validator price tolerance.
+PRICE_TOLERANCE_RATIO = 0.002
+PRICE_TOLERANCE_MIN_USD = 0.50
+
+BAND_RATIO = 0.005
 BAND_MIN_USD = 1.0
 
-# After this much time past the deadline with no resolution, anyone can
-# void the market and everyone claims their stake back. Funds must never
-# be able to stay locked.
 VOID_GRACE_SECONDS = 7 * 24 * 60 * 60
 
-MAX_QUESTION_LEN = 500
-MIN_QUESTION_LEN = 5
 
+# ============================================================
+# EVM PAYEE INTERFACE
+# ============================================================
 
-# Transfers to an EOA through get_contract_at move zero wei silently.
-# Going through an evm contract interface is the form that actually pays.
 @gl.evm.contract_interface
 class _Payee:
     class View:
@@ -55,462 +58,2144 @@ class _Payee:
         pass
 
 
-# ---------------------------------------------------------------------
-# PURE HELPERS  (module level on purpose)
-#
-# These are called from inside the non-deterministic closures. They must
-# not touch self: storage is inaccessible from non-deterministic blocks,
-# and a bound method drags the contract object into the sandbox.
-# ---------------------------------------------------------------------
-
-
-def _extract_price(raw_text: str, coin_id: str) -> float:
-    data = json.loads(raw_text)
-
-    if coin_id not in data:
-        raise gl.vm.UserError("[EXTERNAL] ASSET_MISSING")
-
-    entry = data[coin_id]
-
-    if "usd" not in entry:
-        raise gl.vm.UserError("[EXTERNAL] USD_MISSING")
-
-    price = float(entry["usd"])
-
-    if price <= 0:
-        raise gl.vm.UserError("[EXTERNAL] INVALID_PRICE")
-
-    return price
-
-
-def _classify(price: float, threshold: float) -> str:
-    band = max(BAND_MIN_USD, threshold * BAND_RATIO)
-
-    if abs(price - threshold) <= band:
-        return "UNRESOLVED"
-
-    return "YES" if price > threshold else "NO"
-
-
-# ---------------------------------------------------------------------
-
+# ============================================================
+# PREDICTION MARKET
+# ============================================================
 
 class PredictionMarket(gl.Contract):
+
+    # --------------------------------------------------------
+    # Persistent storage
+    # --------------------------------------------------------
+
     counter: u256
+
     markets: TreeMap[str, str]
+
     positions: TreeMap[str, str]
-    claimed: TreeMap[str, bool]
+
+    claims: TreeMap[str, str]
+
     market_ids: DynArray[str]
+
+
+    # ========================================================
+    # CONSTRUCTOR
+    # ========================================================
 
     def __init__(self):
         self.counter = u256(0)
 
-    # =================================================================
-    # KEYS / TIME
-    # =================================================================
 
-    def _market_key(self, market_id: str) -> str:
+    # ========================================================
+    # BASIC HELPERS
+    # ========================================================
+
+    def _market_key(
+        self,
+        market_id: str,
+    ) -> str:
+
         return "market:" + str(market_id)
 
-    def _position_key(self, market_id: str, user: str) -> str:
-        return "position:" + str(market_id) + ":" + str(user).strip().lower()
 
-    def _claim_key(self, market_id: str, user: str) -> str:
-        return "claim:" + str(market_id) + ":" + str(user).strip().lower()
+    def _position_key(
+        self,
+        market_id: str,
+        user: str,
+    ) -> str:
 
-    def _now(self) -> int:
-        # THE most version-sensitive line in this file. Run time_probe.py
-        # against your pinned runtime and swap this body for whichever
-        # candidate reported a sane value on every validator.
-        return int(datetime.datetime.now(datetime.timezone.utc).timestamp())
-
-    def _sender(self) -> str:
-        return gl.message.sender_address.as_hex.lower()
-
-    # =================================================================
-    # STORAGE
-    # =================================================================
-
-    def _read_market(self, market_id: str):
-        key = self._market_key(market_id)
-
-        if key not in self.markets:
-            raise gl.vm.UserError("[EXPECTED] MARKET_NOT_FOUND")
-
-        return json.loads(self.markets[key])
-
-    def _save_market(self, market) -> None:
-        key = self._market_key(market["id"])
-        self.markets[key] = json.dumps(market, sort_keys=True, separators=(",", ":"))
-
-    def _read_position(self, market_id: str, user: str):
-        key = self._position_key(market_id, user)
-
-        if key not in self.positions:
-            return {
-                "market_id": str(market_id),
-                "user": str(user).strip().lower(),
-                "yes": "0",
-                "no": "0",
-            }
-
-        return json.loads(self.positions[key])
-
-    def _save_position(self, position) -> None:
-        key = self._position_key(position["market_id"], position["user"])
-        self.positions[key] = json.dumps(
-            position, sort_keys=True, separators=(",", ":")
+        return (
+            "position:"
+            + str(market_id)
+            + ":"
+            + str(user).strip().lower()
         )
 
-    # =================================================================
-    # VALIDATION
-    # =================================================================
 
-    def _validate_asset(self, asset: str) -> str:
-        symbol = str(asset).upper().strip()
+    def _claim_key(
+        self,
+        market_id: str,
+        user: str,
+    ) -> str:
 
-        if symbol not in COIN_IDS:
-            raise gl.vm.UserError("[EXPECTED] UNSUPPORTED_ASSET")
+        return (
+            "claim:"
+            + str(market_id)
+            + ":"
+            + str(user).strip().lower()
+        )
 
-        return symbol
 
-    def _validate_source(self, source: str) -> str:
-        url = str(source).strip()
+    def _sender(self) -> str:
 
-        for prefix in ALLOWED_SOURCE_PREFIXES:
-            if url.startswith(prefix):
-                return url
+        return gl.message.sender_address.as_hex.lower()
 
-        raise gl.vm.UserError("[EXPECTED] SOURCE_NOT_ALLOWED")
 
-    def _pay(self, to_address: str, amount: int) -> None:
-        if amount <= 0:
-            return
+    def _now(self) -> int:
 
-        _Payee(Address(to_address)).emit_transfer(value=u256(amount))
+        raw = gl.message_raw["datetime"]
 
-    # =================================================================
-    # CREATE
-    # =================================================================
+        try:
+
+            normalized = str(raw).replace(
+                "Z",
+                "+00:00",
+            )
+
+            return int(
+                datetime.datetime.fromisoformat(
+                    normalized
+                ).timestamp()
+            )
+
+        except Exception:
+
+            raise gl.vm.UserError(
+                "[EXPECTED] INVALID_TRANSACTION_TIMESTAMP"
+            )
+
+
+    def _load_market(
+        self,
+        market_id: str,
+    ):
+
+        key = self._market_key(
+            market_id
+        )
+
+        if key not in self.markets:
+
+            raise gl.vm.UserError(
+                "[EXPECTED] MARKET_NOT_FOUND"
+            )
+
+        try:
+
+            return json.loads(
+                self.markets[key]
+            )
+
+        except Exception:
+
+            raise gl.vm.UserError(
+                "[EXPECTED] INVALID_MARKET_STATE"
+            )
+
+
+    def _save_market(
+        self,
+        market,
+    ) -> None:
+
+        key = self._market_key(
+            market["id"]
+        )
+
+        self.markets[key] = json.dumps(
+            market,
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+
+
+    def _load_position(
+        self,
+        market_id: str,
+        user: str,
+    ):
+
+        key = self._position_key(
+            market_id,
+            user,
+        )
+
+        if key not in self.positions:
+
+            return {
+                "market_id": str(
+                    market_id
+                ),
+                "user": str(
+                    user
+                ).lower(),
+                "yes": "0",
+                "no": "0",
+                "total": "0",
+            }
+
+        try:
+
+            return json.loads(
+                self.positions[key]
+            )
+
+        except Exception:
+
+            raise gl.vm.UserError(
+                "[EXPECTED] INVALID_POSITION_STATE"
+            )
+
+
+    def _save_position(
+        self,
+        position,
+    ) -> None:
+
+        key = self._position_key(
+            position["market_id"],
+            position["user"],
+        )
+
+        self.positions[key] = json.dumps(
+            position,
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+
+
+    # ========================================================
+    # SAFE PUBLIC OUTPUTS
+    # ========================================================
+
+    def _safe_market_output(
+        self,
+        market,
+    ):
+
+        return {
+
+            "id": str(
+                market.get(
+                    "id",
+                    "",
+                )
+            ),
+
+            "question": str(
+                market.get(
+                    "question",
+                    "",
+                )
+            ),
+
+            "asset": str(
+                market.get(
+                    "asset",
+                    "",
+                )
+            ),
+
+            "coin_id": str(
+                market.get(
+                    "coin_id",
+                    "",
+                )
+            ),
+
+            "threshold": str(
+                market.get(
+                    "threshold",
+                    "0",
+                )
+            ),
+
+            "deadline": str(
+                market.get(
+                    "deadline",
+                    "0",
+                )
+            ),
+
+            "source": str(
+                market.get(
+                    "source",
+                    "",
+                )
+            ),
+
+            "status": str(
+                market.get(
+                    "status",
+                    "open",
+                )
+            ),
+
+            "outcome": str(
+                market.get(
+                    "outcome",
+                    "",
+                )
+            ),
+
+            "verified": bool(
+                market.get(
+                    "verified",
+                    False,
+                )
+            ),
+
+            "yes_pool": str(
+                market.get(
+                    "yes_pool",
+                    "0",
+                )
+            ),
+
+            "no_pool": str(
+                market.get(
+                    "no_pool",
+                    "0",
+                )
+            ),
+
+            "total_pool": str(
+                market.get(
+                    "total_pool",
+                    "0",
+                )
+            ),
+
+            "created_at": str(
+                market.get(
+                    "created_at",
+                    "0",
+                )
+            ),
+
+            "resolved_at": str(
+                market.get(
+                    "resolved_at",
+                    "",
+                )
+            ),
+
+            "resolution_evidence": market.get(
+                "resolution_evidence",
+                {},
+            ),
+        }
+
+
+    def _safe_position_output(
+        self,
+        position,
+    ):
+
+        return {
+
+            "market_id": str(
+                position.get(
+                    "market_id",
+                    "",
+                )
+            ),
+
+            "user": str(
+                position.get(
+                    "user",
+                    "",
+                )
+            ),
+
+            "yes": str(
+                position.get(
+                    "yes",
+                    "0",
+                )
+            ),
+
+            "no": str(
+                position.get(
+                    "no",
+                    "0",
+                )
+            ),
+
+            "total": str(
+                position.get(
+                    "total",
+                    "0",
+                )
+            ),
+        }
+
+
+    # ========================================================
+    # HISTORICAL SOURCE
+    # ========================================================
+
+    def _build_source(
+        self,
+        asset: str,
+        deadline: int,
+    ) -> str:
+
+        coin_id = COIN_IDS[asset]
+
+        start_time = (
+            int(deadline)
+            - EVIDENCE_WINDOW_SECONDS
+        )
+
+        end_time = (
+            int(deadline)
+            + EVIDENCE_WINDOW_SECONDS
+        )
+
+        return (
+            "https://api.coingecko.com/api/v3/"
+            "coins/"
+            + coin_id
+            + "/market_chart/range"
+            "?vs_currency=usd"
+            "&from="
+            + str(start_time)
+            + "&to="
+            + str(end_time)
+        )
+
+
+    # ========================================================
+    # HISTORICAL PRICE EXTRACTION
+    # ========================================================
+
+    def _extract_historical_price(
+        self,
+        response_body: str,
+        deadline: int,
+    ):
+
+        try:
+
+            data = json.loads(
+                response_body
+            )
+
+        except Exception:
+
+            raise ValueError(
+                "INVALID_JSON"
+            )
+
+
+        prices = data.get(
+            "prices",
+            [],
+        )
+
+
+        if not isinstance(
+            prices,
+            list,
+        ):
+
+            raise ValueError(
+                "INVALID_PRICES"
+            )
+
+
+        if len(prices) == 0:
+
+            raise ValueError(
+                "NO_HISTORICAL_PRICES"
+            )
+
+
+        best_price = None
+
+        best_timestamp = None
+
+        best_distance = None
+
+
+        for item in prices:
+
+            if not isinstance(
+                item,
+                list,
+            ):
+
+                continue
+
+
+            if len(item) < 2:
+
+                continue
+
+
+            try:
+
+                timestamp_ms = float(
+                    item[0]
+                )
+
+                price = float(
+                    item[1]
+                )
+
+            except Exception:
+
+                continue
+
+
+            if price <= 0:
+
+                continue
+
+
+            observed_at = int(
+                round(
+                    timestamp_ms
+                    / 1000.0
+                )
+            )
+
+
+            distance = abs(
+                observed_at
+                - int(deadline)
+            )
+
+
+            if (
+                best_distance is None
+                or distance < best_distance
+            ):
+
+                best_price = price
+
+                best_timestamp = (
+                    observed_at
+                )
+
+                best_distance = (
+                    distance
+                )
+
+
+        if best_price is None:
+
+            raise ValueError(
+                "NO_VALID_HISTORICAL_PRICE"
+            )
+
+
+        if (
+            best_distance
+            > MAX_OBSERVATION_DISTANCE_SECONDS
+        ):
+
+            raise ValueError(
+                "OBSERVATION_TOO_FAR_FROM_DEADLINE"
+            )
+
+
+        return {
+
+            "price": float(
+                best_price
+            ),
+
+            "observed_at": int(
+                best_timestamp
+            ),
+
+            "distance_seconds": int(
+                best_distance
+            ),
+        }
+
+
+    # ========================================================
+    # OUTCOME
+    # ========================================================
+
+    def _calculate_outcome(
+        self,
+        price: float,
+        threshold: float,
+    ):
+
+        if price > threshold:
+
+            return "YES"
+
+        return "NO"
+
+
+    # ========================================================
+    # CREATE MARKET
+    # ========================================================
 
     @gl.public.write
     def create_market(
         self,
-        question: str,
         asset: str,
         threshold: str,
         deadline: str,
-        resolution_source: str,
-    ) -> str:
-        text = str(question).strip()
+    ):
 
-        if len(text) < MIN_QUESTION_LEN or len(text) > MAX_QUESTION_LEN:
-            raise gl.vm.UserError("[EXPECTED] BAD_QUESTION_LENGTH")
+        clean_asset = (
+            str(asset)
+            .upper()
+            .strip()
+        )
 
-        symbol = self._validate_asset(asset)
-        source = self._validate_source(resolution_source)
+
+        if clean_asset not in ALLOWED_ASSETS:
+
+            raise gl.vm.UserError(
+                "[EXPECTED] UNSUPPORTED_ASSET"
+            )
+
 
         try:
-            threshold_value = float(str(threshold))
+
+            threshold_value = float(
+                str(threshold)
+            )
+
         except Exception:
-            raise gl.vm.UserError("[EXPECTED] BAD_THRESHOLD")
+
+            raise gl.vm.UserError(
+                "[EXPECTED] INVALID_THRESHOLD"
+            )
+
 
         if threshold_value <= 0:
-            raise gl.vm.UserError("[EXPECTED] BAD_THRESHOLD")
+
+            raise gl.vm.UserError(
+                "[EXPECTED] INVALID_THRESHOLD"
+            )
+
 
         try:
-            deadline_value = int(str(deadline))
+
+            deadline_value = int(
+                str(deadline)
+            )
+
         except Exception:
-            raise gl.vm.UserError("[EXPECTED] BAD_DEADLINE")
+
+            raise gl.vm.UserError(
+                "[EXPECTED] INVALID_DEADLINE"
+            )
+
 
         now = self._now()
 
-        if deadline_value <= now:
-            raise gl.vm.UserError("[EXPECTED] DEADLINE_IN_PAST")
 
-        self.counter = u256(int(self.counter) + 1)
-        market_id = str(int(self.counter))
+        if deadline_value <= now:
+
+            raise gl.vm.UserError(
+                "[EXPECTED] DEADLINE_MUST_BE_IN_FUTURE"
+            )
+
+
+        coin_id = COIN_IDS[
+            clean_asset
+        ]
+
+        display_name = DISPLAY_NAMES[
+            clean_asset
+        ]
+
+
+        source = self._build_source(
+            clean_asset,
+            deadline_value,
+        )
+
+
+        self.counter = u256(
+            int(self.counter) + 1
+        )
+
+
+        market_id = str(
+            int(self.counter)
+        )
+
+
+        question = (
+            "Will "
+            + display_name
+            + " ("
+            + clean_asset
+            + ") be above $"
+            + str(threshold_value)
+            + " at the market deadline?"
+        )
+
 
         market = {
+
             "id": market_id,
-            "question": text,
-            "asset": symbol,
-            "coin_id": COIN_IDS[symbol],
-            "threshold": repr(threshold_value),
-            "deadline": str(deadline_value),
-            "void_after": str(deadline_value + VOID_GRACE_SECONDS),
-            "resolution_source": source,
-            "creator": self._sender(),
+
+            "question": question,
+
+            "asset": clean_asset,
+
+            "coin_id": coin_id,
+
+            "threshold": str(
+                threshold_value
+            ),
+
+            "deadline": str(
+                deadline_value
+            ),
+
+            "source": source,
+
             "status": "open",
-            "yes_pool": "0",
-            "no_pool": "0",
-            "resolved_price": "",
+
             "outcome": "",
+
+            "verified": False,
+
+            "yes_pool": "0",
+
+            "no_pool": "0",
+
+            "total_pool": "0",
+
+            "created_at": str(
+                now
+            ),
+
             "resolved_at": "",
-            "resolved_by": "",
-            "created_at": str(now),
+
+            "resolution_evidence": {},
         }
 
-        self._save_market(market)
-        self.market_ids.append(market_id)
 
-        return json.dumps(market, sort_keys=True, separators=(",", ":"))
+        self._save_market(
+            market
+        )
 
-    # =================================================================
-    # BET  (real value, escrowed by this contract)
-    # =================================================================
+
+        self.market_ids.append(
+            market_id
+        )
+
+
+        return self._safe_market_output(
+            market
+        )
+
+
+    # ========================================================
+    # PLACE BET
+    # ========================================================
 
     @gl.public.write.payable
-    def place_bet(self, market_id: str, side: str) -> str:
-        amount = int(gl.message.value)
+    def place_bet(
+        self,
+        market_id: str,
+        side: str,
+    ):
+
+        market = self._load_market(
+            market_id
+        )
+
+
+        if market["status"] != "open":
+
+            raise gl.vm.UserError(
+                "[EXPECTED] MARKET_NOT_OPEN"
+            )
+
+
+        now = self._now()
+
+        deadline = int(
+            market["deadline"]
+        )
+
+
+        if now >= deadline:
+
+            raise gl.vm.UserError(
+                "[EXPECTED] BETTING_DEADLINE_PASSED"
+            )
+
+
+        clean_side = (
+            str(side)
+            .upper()
+            .strip()
+        )
+
+
+        if clean_side not in (
+            "YES",
+            "NO",
+        ):
+
+            raise gl.vm.UserError(
+                "[EXPECTED] INVALID_SIDE"
+            )
+
+
+        amount = int(
+            gl.message.value
+        )
+
 
         if amount <= 0:
-            raise gl.vm.UserError("[EXPECTED] ZERO_VALUE")
 
-        market = self._read_market(market_id)
+            raise gl.vm.UserError(
+                "[EXPECTED] BET_VALUE_MUST_BE_POSITIVE"
+            )
 
-        if market["status"] != "open":
-            raise gl.vm.UserError("[EXPECTED] MARKET_NOT_OPEN")
-
-        if self._now() >= int(market["deadline"]):
-            raise gl.vm.UserError("[EXPECTED] DEADLINE_PASSED")
-
-        chosen = str(side).strip().upper()
-
-        if chosen != "YES" and chosen != "NO":
-            raise gl.vm.UserError("[EXPECTED] BAD_SIDE")
 
         user = self._sender()
-        position = self._read_position(market_id, user)
 
-        if chosen == "YES":
-            position["yes"] = str(int(position["yes"]) + amount)
-            market["yes_pool"] = str(int(market["yes_pool"]) + amount)
-        else:
-            position["no"] = str(int(position["no"]) + amount)
-            market["no_pool"] = str(int(market["no_pool"]) + amount)
 
-        self._save_market(market)
-        self._save_position(position)
-
-        return json.dumps(
-            {"market": market, "position": position},
-            sort_keys=True,
-            separators=(",", ":"),
+        position = self._load_position(
+            market_id,
+            user,
         )
 
-    # =================================================================
-    # RESOLVE
-    # =================================================================
+
+        if clean_side == "YES":
+
+            position["yes"] = str(
+                int(position["yes"])
+                + amount
+            )
+
+            market["yes_pool"] = str(
+                int(market["yes_pool"])
+                + amount
+            )
+
+        else:
+
+            position["no"] = str(
+                int(position["no"])
+                + amount
+            )
+
+            market["no_pool"] = str(
+                int(market["no_pool"])
+                + amount
+            )
+
+
+        position["total"] = str(
+            int(position["yes"])
+            + int(position["no"])
+        )
+
+
+        market["total_pool"] = str(
+            int(market["yes_pool"])
+            + int(market["no_pool"])
+        )
+
+
+        self._save_position(
+            position
+        )
+
+
+        self._save_market(
+            market
+        )
+
+
+        return {
+
+            "market_id": str(
+                market_id
+            ),
+
+            "user": user,
+
+            "side": clean_side,
+
+            "amount": str(
+                amount
+            ),
+
+            "position": self._safe_position_output(
+                position
+            ),
+
+            "market": self._safe_market_output(
+                market
+            ),
+        }
+
+
+    # ========================================================
+    # RESOLVE MARKET
+    # ========================================================
 
     @gl.public.write
-    def resolve_market(self, market_id: str) -> str:
-        market = self._read_market(market_id)
+    def resolve_market(
+        self,
+        market_id: str,
+    ):
+
+        market = self._load_market(
+            market_id
+        )
+
 
         if market["status"] != "open":
-            return json.dumps(market, sort_keys=True, separators=(",", ":"))
 
-        if self._now() < int(market["deadline"]):
-            raise gl.vm.UserError("[EXPECTED] BEFORE_DEADLINE")
+            raise gl.vm.UserError(
+                "[EXPECTED] MARKET_NOT_OPEN"
+            )
 
-        # Copy everything the closures need into plain locals. No self,
-        # no storage handles cross the sandbox boundary.
-        source = str(market["resolution_source"])
-        coin_id = str(market["coin_id"])
-        threshold = float(market["threshold"])
 
-        # gl.nondet.* is spelled out literally inside each closure, in the
-        # same scope as the function handed to run_nondet_unsafe. Hiding
-        # the fetch in a helper method breaks genvm-lint's scope match.
+        deadline = int(
+            market["deadline"]
+        )
+
+
+        now = self._now()
+
+
+        if now < deadline:
+
+            raise gl.vm.UserError(
+                "[EXPECTED] DEADLINE_NOT_REACHED"
+            )
+
+
+        stored_asset = str(
+            market["asset"]
+        ).upper()
+
+
+        stored_coin_id = str(
+            market["coin_id"]
+        )
+
+
+        stored_threshold = float(
+            market["threshold"]
+        )
+
+
+        stored_source = str(
+            market["source"]
+        )
+
+
+        expected_source = self._build_source(
+            stored_asset,
+            deadline,
+        )
+
+
+        if stored_asset not in ALLOWED_ASSETS:
+
+            raise gl.vm.UserError(
+                "[EXPECTED] INVALID_STORED_ASSET"
+            )
+
+
+        if (
+            stored_coin_id
+            != COIN_IDS[stored_asset]
+        ):
+
+            raise gl.vm.UserError(
+                "[EXPECTED] INVALID_STORED_COIN_ID"
+            )
+
+
+        if (
+            stored_source
+            != expected_source
+        ):
+
+            raise gl.vm.UserError(
+                "[EXPECTED] INVALID_STORED_SOURCE"
+            )
+
+
+        # ====================================================
+        # LEADER
+        # ====================================================
+
         def leader_fn():
-            raw = gl.nondet.web.render(source, mode="text")
-            price = _extract_price(raw, coin_id)
 
+            response = gl.nondet.web.get(
+                stored_source
+            )
+
+
+            body = response.body.decode(
+                "utf-8"
+            )
+
+
+            observation = (
+                self._extract_historical_price(
+                    body,
+                    deadline,
+                )
+            )
+
+
+            price = float(
+                observation["price"]
+            )
+
+
+            observed_at = int(
+                observation["observed_at"]
+            )
+
+
+            distance_seconds = int(
+                observation[
+                    "distance_seconds"
+                ]
+            )
+
+
+            outcome = (
+                self._calculate_outcome(
+                    price,
+                    stored_threshold,
+                )
+            )
+
+
+            # IMPORTANT:
+            # run_nondet_unsafe / gl.vm.Return must
+            # receive calldata-encodable values.
+            # Floats are converted to strings here.
             return {
-                "coin_id": coin_id,
-                "price": repr(price),
-                "outcome": _classify(price, threshold),
+
+                "asset": str(
+                    stored_asset
+                ),
+
+                "coin_id": str(
+                    stored_coin_id
+                ),
+
+                "deadline": str(
+                    deadline
+                ),
+
+                "source": str(
+                    stored_source
+                ),
+
+                "observed_at": str(
+                    observed_at
+                ),
+
+                "price": str(
+                    price
+                ),
+
+                "distance_seconds": str(
+                    distance_seconds
+                ),
+
+                "outcome": str(
+                    outcome
+                ),
             }
 
-        def validator_fn(leader_result) -> bool:
-            if not isinstance(leader_result, gl.vm.Return):
+
+        # ====================================================
+        # VALIDATOR
+        # ====================================================
+
+        def validator_fn(
+            leader_result,
+        ) -> bool:
+
+            if not isinstance(
+                leader_result,
+                gl.vm.Return,
+            ):
+
                 return False
 
-            leader_data = leader_result.calldata
 
-            if not isinstance(leader_data, dict):
+            leader = (
+                leader_result.calldata
+            )
+
+
+            try:
+
+                # --------------------------------------------
+                # Static fields
+                # --------------------------------------------
+
+                if (
+                    str(
+                        leader["asset"]
+                    ).upper()
+                    != stored_asset
+                ):
+
+                    return False
+
+
+                if (
+                    str(
+                        leader["coin_id"]
+                    )
+                    != stored_coin_id
+                ):
+
+                    return False
+
+
+                if (
+                    int(
+                        leader["deadline"]
+                    )
+                    != deadline
+                ):
+
+                    return False
+
+
+                if (
+                    str(
+                        leader["source"]
+                    )
+                    != stored_source
+                ):
+
+                    return False
+
+
+                leader_price = float(
+                    leader["price"]
+                )
+
+
+                leader_observed_at = int(
+                    leader["observed_at"]
+                )
+
+
+                leader_distance = int(
+                    leader["distance_seconds"]
+                )
+
+
+                leader_outcome = str(
+                    leader["outcome"]
+                ).upper()
+
+
+                if leader_price <= 0:
+
+                    return False
+
+
+                if leader_outcome not in (
+                    "YES",
+                    "NO",
+                ):
+
+                    return False
+
+
+                if leader_distance < 0:
+
+                    return False
+
+
+                if (
+                    leader_distance
+                    > MAX_OBSERVATION_DISTANCE_SECONDS
+                ):
+
+                    return False
+
+
+                # --------------------------------------------
+                # Independent validator fetch
+                # --------------------------------------------
+
+                response = gl.nondet.web.get(
+                    stored_source
+                )
+
+
+                body = response.body.decode(
+                    "utf-8"
+                )
+
+
+                validator_observation = (
+                    self._extract_historical_price(
+                        body,
+                        deadline,
+                    )
+                )
+
+
+                validator_price = float(
+                    validator_observation[
+                        "price"
+                    ]
+                )
+
+
+                validator_observed_at = int(
+                    validator_observation[
+                        "observed_at"
+                    ]
+                )
+
+
+                validator_distance = int(
+                    validator_observation[
+                        "distance_seconds"
+                    ]
+                )
+
+
+                if validator_price <= 0:
+
+                    return False
+
+
+                if (
+                    validator_distance
+                    > MAX_OBSERVATION_DISTANCE_SECONDS
+                ):
+
+                    return False
+
+
+                # --------------------------------------------
+                # Observation timestamp agreement
+                # --------------------------------------------
+
+                if (
+                    leader_observed_at
+                    != validator_observed_at
+                ):
+
+                    return False
+
+
+                # --------------------------------------------
+                # Distance agreement
+                # --------------------------------------------
+
+                if (
+                    leader_distance
+                    != validator_distance
+                ):
+
+                    return False
+
+
+                # --------------------------------------------
+                # Both observations must be tied to
+                # the stored deadline.
+                # --------------------------------------------
+
+                if (
+                    abs(
+                        leader_observed_at
+                        - deadline
+                    )
+                    > MAX_OBSERVATION_DISTANCE_SECONDS
+                ):
+
+                    return False
+
+
+                if (
+                    abs(
+                        validator_observed_at
+                        - deadline
+                    )
+                    > MAX_OBSERVATION_DISTANCE_SECONDS
+                ):
+
+                    return False
+
+
+                # --------------------------------------------
+                # Price tolerance
+                # --------------------------------------------
+
+                price_difference = abs(
+                    leader_price
+                    - validator_price
+                )
+
+
+                allowed_difference = max(
+                    PRICE_TOLERANCE_MIN_USD,
+                    abs(leader_price)
+                    * PRICE_TOLERANCE_RATIO,
+                )
+
+
+                if (
+                    price_difference
+                    > allowed_difference
+                ):
+
+                    return False
+
+
+                # --------------------------------------------
+                # Validator independently derives outcome.
+                # --------------------------------------------
+
+                validator_outcome = (
+                    self._calculate_outcome(
+                        validator_price,
+                        stored_threshold,
+                    )
+                )
+
+
+                if (
+                    validator_outcome
+                    != leader_outcome
+                ):
+
+                    return False
+
+
+                # --------------------------------------------
+                # Leader outcome must match leader price.
+                # --------------------------------------------
+
+                leader_derived_outcome = (
+                    self._calculate_outcome(
+                        leader_price,
+                        stored_threshold,
+                    )
+                )
+
+
+                if (
+                    leader_derived_outcome
+                    != leader_outcome
+                ):
+
+                    return False
+
+
+                return True
+
+
+            except Exception:
+
                 return False
 
-            if leader_data.get("coin_id") != coin_id:
-                return False
 
-            raw = gl.nondet.web.render(source, mode="text")
-            price = _extract_price(raw, coin_id)
+        # ====================================================
+        # CONSENSUS
+        # ====================================================
 
-            # Agree on the decision, not the number. Two nodes fetch
-            # seconds apart and BTC does not hold still in between.
-            return leader_data.get("outcome") == _classify(price, threshold)
+        result = gl.vm.run_nondet_unsafe(
+            leader_fn,
+            validator_fn,
+        )
 
-        result = gl.vm.run_nondet_unsafe(leader_fn, validator_fn)
 
-        if not isinstance(result, dict):
-            raise gl.vm.UserError("[EXTERNAL] BAD_CONSENSUS_SHAPE")
+        # ====================================================
+        # PERSIST VERIFIED EVIDENCE
+        # ====================================================
 
-        outcome = str(result.get("outcome", "")).upper()
+        try:
 
-        if outcome == "UNRESOLVED":
-            # Price sat on the threshold. Revert so the market stays open
-            # and anyone can retry later, rather than baking a coin flip in.
-            raise gl.vm.UserError("[TRANSIENT] TOO_CLOSE_TO_THRESHOLD")
+            final_asset = str(
+                result["asset"]
+            ).upper()
 
-        if outcome != "YES" and outcome != "NO":
-            raise gl.vm.UserError("[EXTERNAL] BAD_OUTCOME")
+
+            final_coin_id = str(
+                result["coin_id"]
+            )
+
+
+            final_deadline = int(
+                result["deadline"]
+            )
+
+
+            final_source = str(
+                result["source"]
+            )
+
+
+            final_observed_at = int(
+                result["observed_at"]
+            )
+
+
+            final_price = float(
+                result["price"]
+            )
+
+
+            final_distance = int(
+                result["distance_seconds"]
+            )
+
+
+            final_outcome = str(
+                result["outcome"]
+            ).upper()
+
+
+        except Exception:
+
+            raise gl.vm.UserError(
+                "[EXPECTED] INVALID_CONSENSUS_RESULT"
+            )
+
+
+        if final_asset != stored_asset:
+
+            raise gl.vm.UserError(
+                "[EXPECTED] CONSENSUS_ASSET_MISMATCH"
+            )
+
+
+        if final_coin_id != stored_coin_id:
+
+            raise gl.vm.UserError(
+                "[EXPECTED] CONSENSUS_COIN_ID_MISMATCH"
+            )
+
+
+        if final_deadline != deadline:
+
+            raise gl.vm.UserError(
+                "[EXPECTED] CONSENSUS_DEADLINE_MISMATCH"
+            )
+
+
+        if final_source != stored_source:
+
+            raise gl.vm.UserError(
+                "[EXPECTED] CONSENSUS_SOURCE_MISMATCH"
+            )
+
+
+        if final_observed_at <= 0:
+
+            raise gl.vm.UserError(
+                "[EXPECTED] CONSENSUS_OBSERVATION_INVALID"
+            )
+
+
+        if (
+            abs(
+                final_observed_at
+                - deadline
+            )
+            > MAX_OBSERVATION_DISTANCE_SECONDS
+        ):
+
+            raise gl.vm.UserError(
+                "[EXPECTED] CONSENSUS_OBSERVATION_TOO_FAR"
+            )
+
+
+        if final_distance < 0:
+
+            raise gl.vm.UserError(
+                "[EXPECTED] CONSENSUS_DISTANCE_INVALID"
+            )
+
+
+        if (
+            final_distance
+            > MAX_OBSERVATION_DISTANCE_SECONDS
+        ):
+
+            raise gl.vm.UserError(
+                "[EXPECTED] CONSENSUS_DISTANCE_TOO_FAR"
+            )
+
+
+        if final_price <= 0:
+
+            raise gl.vm.UserError(
+                "[EXPECTED] CONSENSUS_PRICE_INVALID"
+            )
+
+
+        if final_outcome not in (
+            "YES",
+            "NO",
+        ):
+
+            raise gl.vm.UserError(
+                "[EXPECTED] CONSENSUS_OUTCOME_INVALID"
+            )
+
+
+        deterministic_outcome = (
+            self._calculate_outcome(
+                final_price,
+                stored_threshold,
+            )
+        )
+
+
+        if (
+            deterministic_outcome
+            != final_outcome
+        ):
+
+            raise gl.vm.UserError(
+                "[EXPECTED] CONSENSUS_OUTCOME_PRICE_MISMATCH"
+            )
+
+
+        # ====================================================
+        # RESOLVE
+        # ====================================================
 
         market["status"] = "resolved"
-        market["outcome"] = outcome
-        market["resolved_price"] = str(result.get("price", ""))
-        market["resolved_at"] = str(self._now())
-        market["resolved_by"] = self._sender()
 
-        self._save_market(market)
+        market["outcome"] = (
+            final_outcome
+        )
 
-        return json.dumps(market, sort_keys=True, separators=(",", ":"))
+        market["verified"] = True
 
-    # =================================================================
-    # VOID  (permissionless escape hatch)
-    # =================================================================
+        market["resolved_at"] = str(
+            now
+        )
 
-    @gl.public.write
-    def void_market(self, market_id: str) -> str:
-        market = self._read_market(market_id)
 
-        if market["status"] != "open":
-            raise gl.vm.UserError("[EXPECTED] NOT_OPEN")
+        market[
+            "resolution_evidence"
+        ] = {
 
-        if self._now() < int(market["void_after"]):
-            raise gl.vm.UserError("[EXPECTED] GRACE_NOT_OVER")
+            "asset": final_asset,
 
-        market["status"] = "void"
-        self._save_market(market)
+            "coin_id": final_coin_id,
 
-        return json.dumps(market, sort_keys=True, separators=(",", ":"))
+            "deadline": str(
+                final_deadline
+            ),
 
-    # =================================================================
+            "source": final_source,
+
+            "observed_at": str(
+                final_observed_at
+            ),
+
+            "price": str(
+                final_price
+            ),
+
+            "distance_seconds": str(
+                final_distance
+            ),
+
+            "outcome": final_outcome,
+
+            "price_tolerance_ratio": str(
+                PRICE_TOLERANCE_RATIO
+            ),
+
+            "price_tolerance_min_usd": str(
+                PRICE_TOLERANCE_MIN_USD
+            ),
+
+            "verified": True,
+        }
+
+
+        self._save_market(
+            market
+        )
+
+
+        return {
+
+            "market_id": str(
+                market_id
+            ),
+
+            "status": "resolved",
+
+            "outcome": final_outcome,
+
+            "verified": True,
+
+            "resolved_at": str(
+                now
+            ),
+
+            "evidence": {
+
+                "asset": final_asset,
+
+                "coin_id": final_coin_id,
+
+                "deadline": str(
+                    final_deadline
+                ),
+
+                "source": final_source,
+
+                "observed_at": str(
+                    final_observed_at
+                ),
+
+                "price": str(
+                    final_price
+                ),
+
+                "distance_seconds": str(
+                    final_distance
+                ),
+
+                "outcome": final_outcome,
+            },
+        }
+
+
+    # ========================================================
     # CLAIM
-    # =================================================================
+    # ========================================================
 
     @gl.public.write
-    def claim(self, market_id: str) -> str:
-        market = self._read_market(market_id)
+    def claim(
+        self,
+        market_id: str,
+    ):
+
+        market = self._load_market(
+            market_id
+        )
+
+
+        if market["status"] != "resolved":
+
+            raise gl.vm.UserError(
+                "[EXPECTED] MARKET_NOT_RESOLVED"
+            )
+
+
+        if not market.get(
+            "verified",
+            False,
+        ):
+
+            raise gl.vm.UserError(
+                "[EXPECTED] MARKET_NOT_VERIFIED"
+            )
+
+
         user = self._sender()
 
-        claim_key = self._claim_key(market_id, user)
 
-        if claim_key in self.claimed:
-            raise gl.vm.UserError("[EXPECTED] ALREADY_CLAIMED")
+        claim_key = self._claim_key(
+            market_id,
+            user,
+        )
 
-        position = self._read_position(market_id, user)
 
-        yes_stake = int(position["yes"])
-        no_stake = int(position["no"])
+        if claim_key in self.claims:
 
-        if yes_stake + no_stake <= 0:
-            raise gl.vm.UserError("[EXPECTED] NO_POSITION")
+            raise gl.vm.UserError(
+                "[EXPECTED] ALREADY_CLAIMED"
+            )
 
-        yes_pool = int(market["yes_pool"])
-        no_pool = int(market["no_pool"])
-        total_pool = yes_pool + no_pool
 
-        status = market["status"]
+        position = self._load_position(
+            market_id,
+            user,
+        )
 
-        if status == "void":
-            payout = yes_stake + no_stake
 
-        elif status == "resolved":
-            if market["outcome"] == "YES":
-                winning_stake = yes_stake
-                winning_pool = yes_pool
-            else:
-                winning_stake = no_stake
-                winning_pool = no_pool
+        if (
+            int(position["total"])
+            <= 0
+        ):
 
-            if winning_pool <= 0:
-                # Nobody took the winning side. Refund rather than strand.
-                payout = yes_stake + no_stake
-            else:
-                payout = winning_stake * total_pool // winning_pool
+            raise gl.vm.UserError(
+                "[EXPECTED] NO_POSITION"
+            )
+
+
+        outcome = str(
+            market["outcome"]
+        ).upper()
+
+
+        if outcome == "YES":
+
+            winning_position = int(
+                position["yes"]
+            )
+
+            winning_pool = int(
+                market["yes_pool"]
+            )
+
+        elif outcome == "NO":
+
+            winning_position = int(
+                position["no"]
+            )
+
+            winning_pool = int(
+                market["no_pool"]
+            )
 
         else:
-            raise gl.vm.UserError("[EXPECTED] NOT_SETTLED")
 
-        # Effects before interaction: mark the claim, then transfer. If the
-        # external message fails the whole call reverts and the claim is
-        # still available instead of being burned.
-        self.claimed[claim_key] = True
-        self._pay(user, payout)
+            raise gl.vm.UserError(
+                "[EXPECTED] INVALID_OUTCOME"
+            )
 
-        return json.dumps(
-            {"market_id": str(market_id), "user": user, "payout": str(payout)},
-            sort_keys=True,
-            separators=(",", ":"),
+
+        if winning_position <= 0:
+
+            raise gl.vm.UserError(
+                "[EXPECTED] LOSING_POSITION"
+            )
+
+
+        if winning_pool <= 0:
+
+            raise gl.vm.UserError(
+                "[EXPECTED] EMPTY_WINNING_POOL"
+            )
+
+
+        total_pool = int(
+            market["total_pool"]
         )
 
-    # =================================================================
-    # VIEWS
-    # =================================================================
 
-    @gl.public.view
-    def get_market(self, market_id: str) -> str:
-        return json.dumps(
-            self._read_market(market_id), sort_keys=True, separators=(",", ":")
+        payout = (
+            winning_position
+            * total_pool
+            // winning_pool
         )
 
-    @gl.public.view
-    def get_position(self, market_id: str, user: str) -> str:
-        return json.dumps(
-            self._read_position(market_id, user),
-            sort_keys=True,
-            separators=(",", ":"),
+
+        if payout <= 0:
+
+            raise gl.vm.UserError(
+                "[EXPECTED] ZERO_PAYOUT"
+            )
+
+
+        try:
+
+            contract_balance = int(
+                self.balance
+            )
+
+        except Exception:
+
+            contract_balance = 0
+
+
+        if (
+            contract_balance > 0
+            and payout > contract_balance
+        ):
+
+            raise gl.vm.UserError(
+                "[EXPECTED] INSUFFICIENT_CONTRACT_BALANCE"
+            )
+
+
+        self.claims[
+            claim_key
+        ] = "true"
+
+
+        _Payee(
+            Address(user)
+        ).emit_transfer(
+            value=u256(
+                payout
+            )
         )
 
+
+        return {
+
+            "market_id": str(
+                market_id
+            ),
+
+            "user": user,
+
+            "outcome": outcome,
+
+            "winning_position": str(
+                winning_position
+            ),
+
+            "winning_pool": str(
+                winning_pool
+            ),
+
+            "total_pool": str(
+                total_pool
+            ),
+
+            "payout": str(
+                payout
+            ),
+
+            "claimed": True,
+        }
+
+
+    # ========================================================
+    # GET MARKET
+    # ========================================================
+
     @gl.public.view
-    def get_odds(self, market_id: str) -> str:
-        market = self._read_market(market_id)
+    def get_market(
+        self,
+        market_id: str,
+    ):
 
-        yes_pool = int(market["yes_pool"])
-        no_pool = int(market["no_pool"])
-        total = yes_pool + no_pool
+        market = self._load_market(
+            market_id
+        )
 
-        # Basis points, integer only. No float ever reaches the caller.
-        if total <= 0:
-            yes_bps = 5000
-            no_bps = 5000
+        return self._safe_market_output(
+            market
+        )
+
+
+    # ========================================================
+    # GET POSITION
+    # ========================================================
+
+    @gl.public.view
+    def get_position(
+        self,
+        market_id: str,
+        user: str,
+    ):
+
+        position = self._load_position(
+            market_id,
+            user,
+        )
+
+        return self._safe_position_output(
+            position
+        )
+
+
+    # ========================================================
+    # HAS CLAIMED
+    # ========================================================
+
+    @gl.public.view
+    def has_claimed(
+        self,
+        market_id: str,
+        user: str,
+    ) -> bool:
+
+        key = self._claim_key(
+            market_id,
+            user,
+        )
+
+        return key in self.claims
+
+
+    # ========================================================
+    # COUNTER
+    # ========================================================
+
+    @gl.public.view
+    def get_counter(
+        self,
+    ) -> str:
+
+        return str(
+            int(self.counter)
+        )
+
+
+    # ========================================================
+    # LATEST ID
+    # ========================================================
+
+    @gl.public.view
+    def get_latest_id(
+        self,
+    ) -> str:
+
+        if int(self.counter) <= 0:
+
+            return "0"
+
+        return str(
+            int(self.counter)
+        )
+
+
+    # ========================================================
+    # LIST MARKETS
+    # ========================================================
+
+    @gl.public.view
+    def list_markets(
+        self,
+    ):
+
+        result = []
+
+
+        for market_id in self.market_ids:
+
+            try:
+
+                market = self._load_market(
+                    market_id
+                )
+
+                result.append(
+                    self._safe_market_output(
+                        market
+                    )
+                )
+
+            except Exception:
+
+                continue
+
+
+        return result
+
+
+    # ========================================================
+    # ODDS
+    # ========================================================
+
+    @gl.public.view
+    def get_odds(
+        self,
+        market_id: str,
+    ):
+
+        market = self._load_market(
+            market_id
+        )
+
+
+        yes_pool = float(
+            market["yes_pool"]
+        )
+
+        no_pool = float(
+            market["no_pool"]
+        )
+
+        total_pool = float(
+            market["total_pool"]
+        )
+
+
+        if total_pool <= 0:
+
+            yes_probability = 0.0
+
+            no_probability = 0.0
+
         else:
-            yes_bps = yes_pool * 10000 // total
-            no_bps = 10000 - yes_bps
 
-        return json.dumps(
-            {
-                "yes_bps": str(yes_bps),
-                "no_bps": str(no_bps),
-                "yes_pool": str(yes_pool),
-                "no_pool": str(no_pool),
-                "total_pool": str(total),
+            yes_probability = (
+                yes_pool
+                / total_pool
+                * 100.0
+            )
+
+            no_probability = (
+                no_pool
+                / total_pool
+                * 100.0
+            )
+
+
+        return {
+
+            "market_id": str(
+                market_id
+            ),
+
+            "yes_pool": str(
+                market["yes_pool"]
+            ),
+
+            "no_pool": str(
+                market["no_pool"]
+            ),
+
+            "total_pool": str(
+                market["total_pool"]
+            ),
+
+            "yes_probability": str(
+                yes_probability
+            ),
+
+            "no_probability": str(
+                no_probability
+            ),
+        }
+
+
+    # ========================================================
+    # RESOLUTION EVIDENCE
+    # ========================================================
+
+    @gl.public.view
+    def get_resolution_evidence(
+        self,
+        market_id: str,
+    ):
+
+        market = self._load_market(
+            market_id
+        )
+
+
+        evidence = market.get(
+            "resolution_evidence",
+            {},
+        )
+
+
+        if not evidence:
+
+            return {
+
+                "market_id": str(
+                    market_id
+                ),
+
+                "verified": False,
+
+                "evidence": {},
+            }
+
+
+        return {
+
+            "market_id": str(
+                market_id
+            ),
+
+            "verified": bool(
+                market.get(
+                    "verified",
+                    False,
+                )
+            ),
+
+            "evidence": {
+
+                "asset": str(
+                    evidence.get(
+                        "asset",
+                        "",
+                    )
+                ),
+
+                "coin_id": str(
+                    evidence.get(
+                        "coin_id",
+                        "",
+                    )
+                ),
+
+                "deadline": str(
+                    evidence.get(
+                        "deadline",
+                        "0",
+                    )
+                ),
+
+                "source": str(
+                    evidence.get(
+                        "source",
+                        "",
+                    )
+                ),
+
+                "observed_at": str(
+                    evidence.get(
+                        "observed_at",
+                        "0",
+                    )
+                ),
+
+                "price": str(
+                    evidence.get(
+                        "price",
+                        "0",
+                    )
+                ),
+
+                "distance_seconds": str(
+                    evidence.get(
+                        "distance_seconds",
+                        "0",
+                    )
+                ),
+
+                "outcome": str(
+                    evidence.get(
+                        "outcome",
+                        "",
+                    )
+                ),
+
+                "price_tolerance_ratio": str(
+                    evidence.get(
+                        "price_tolerance_ratio",
+                        PRICE_TOLERANCE_RATIO,
+                    )
+                ),
+
+                "price_tolerance_min_usd": str(
+                    evidence.get(
+                        "price_tolerance_min_usd",
+                        PRICE_TOLERANCE_MIN_USD,
+                    )
+                ),
+
+                "verified": bool(
+                    evidence.get(
+                        "verified",
+                        False,
+                    )
+                ),
             },
-            sort_keys=True,
-            separators=(",", ":"),
-        )
-
-    @gl.public.view
-    def has_claimed(self, market_id: str, user: str) -> str:
-        key = self._claim_key(market_id, user)
-        return "true" if key in self.claimed else "false"
-
-    @gl.public.view
-    def list_markets(self) -> str:
-        ids = [str(x) for x in self.market_ids]
-        return json.dumps(ids, separators=(",", ":"))
-
-    @gl.public.view
-    def get_counter(self) -> str:
-        return str(int(self.counter))
+        }
