@@ -1,10 +1,12 @@
-# Prediction Ledger
+# Prediction Ledger × GenLayer
 
-Prediction Ledger is a decentralized prediction-market application built with **GenLayer Intelligent Contracts**.
+Prediction Ledger is a decentralized prediction-market application built with **GenLayer**.
 
-The project allows users to create and participate in prediction markets around real-world asset prices. Market outcomes are resolved through GenLayer's consensus mechanism rather than relying on a single centralized resolver.
+Users can create markets for BTC, ETH, and SOL based on a specific price threshold and deadline, place YES/NO positions, and resolve expired markets using externally retrieved historical price evidence.
 
-The current implementation focuses on BTC, ETH, and SOL price predictions and demonstrates how an on-chain prediction market can combine smart-contract state, user positions, and decentralized real-world resolution.
+The project combines a real GenLayer smart contract with a web frontend to demonstrate how **non-deterministic external data can be verified and turned into deterministic on-chain market outcomes**.
+
+---
 
 ## Live Demo
 
@@ -14,355 +16,832 @@ https://peridiction-ledger.vercel.app
 
 https://github.com/mahdizangi7/prediction-ledger
 
----
+## Network
 
-## What It Does
+GenLayer Studio / Studionet
 
-Prediction Ledger provides a simple workflow:
+**Chain ID:** `61999`
 
-1. A prediction market is created with:
-
-   * A question
-   * An underlying asset
-   * A target price
-   * A resolution source
-   * A deadline
-
-2. Users choose **YES** or **NO** and place a prediction.
-
-3. The contract stores:
-
-   * Market metadata
-   * YES pool
-   * NO pool
-   * Total pool
-   * User positions
-   * Market status
-
-4. After the market deadline, the market can be resolved.
-
-5. GenLayer validators independently retrieve the specified real-world information and participate in consensus over the result.
-
-6. The resolved outcome is stored in the Intelligent Contract state.
-
-This creates a reusable primitive for applications that need decentralized verification of real-world events.
-
----
-
-## Example Markets
-
-The current frontend is designed around three example markets:
-
-* **Will Bitcoin (BTC) be above $120,000 in one week?**
-* **Will Ethereum (ETH) be above $5,000 in one week?**
-* **Will Solana (SOL) be above $250 in one week?**
-
-The frontend can display market information, current pools, odds, and the connected user's position.
-
----
-
-## Why GenLayer?
-
-Traditional smart contracts cannot directly access arbitrary real-world information.
-
-Prediction markets need an external source of truth because their final outcome depends on information that exists outside the blockchain.
-
-Prediction Ledger uses GenLayer's Intelligent Contract architecture to make the resolution process part of the decentralized execution model.
-
-Instead of trusting one backend server to determine the result, the contract can use GenLayer's validator consensus to independently evaluate the external information.
-
-This makes the project useful as a building block for:
-
-* Prediction markets
-* Event-based applications
-* Real-world settlement
-* Oracle-like verification primitives
-* Autonomous applications requiring external information
-
----
-
-# Architecture
+## Deployed Contract
 
 ```text
-┌─────────────────────────────┐
-│        User Interface       │
-│       frontend/index.html   │
-└──────────────┬──────────────┘
-               │
-               │ genlayer-js
-               ▼
-┌─────────────────────────────┐
-│     GenLayer Studionet      │
-│                             │
-│ PredictionMarket Contract   │
-└──────────────┬──────────────┘
-               │
-               │ Consensus Resolution
-               ▼
-┌─────────────────────────────┐
-│     GenLayer Validators     │
-│                             │
-│ Independent external-data   │
-│ retrieval + verification    │
-└──────────────┬──────────────┘
-               │
-               ▼
-┌─────────────────────────────┐
-│       Real-world source     │
-│                             │
-│      CoinGecko API          │
-└─────────────────────────────┘
+0x1C011f310166CB73aD36A9E02b33519D72c9f160
+```
+
+RPC:
+
+```text
+https://studio.genlayer.com/api
 ```
 
 ---
 
-# Smart Contract
+# Overview
 
-The main Intelligent Contract is:
+Prediction Ledger allows a user to create a prediction market such as:
 
-```text
-contracts/prediction_market.py
-```
+> Will Bitcoin (BTC) be above $120,000 at the market deadline?
 
-The contract implements the core prediction-market state and operations.
+Each market contains:
 
-## Main State
-
-The contract maintains:
-
-* A market counter
-* Market records
-* User positions
+* Asset
+* Coin ID
+* Price threshold
+* Deadline
+* Generated market question
+* YES pool
+* NO pool
 * Market status
-* YES and NO pools
-* Resolution information
+* Resolution outcome
+* Resolution evidence
+* Verification status
 
-Market information is serialized into contract state so it can be retrieved by the frontend.
+The important part of the design is that the market's question and settlement logic are derived from values stored by the smart contract.
 
----
-
-# Contract Methods
-
-The contract exposes methods for the complete market lifecycle.
-
-### `create_market`
-
-Creates a new prediction market.
-
-Conceptually:
-
-```text
-create_market(
-    question,
-    asset,
-    threshold,
-    resolution_source,
-    deadline
-)
-```
-
-The market records the question, asset, target threshold, external resolution source, creator, deadline, and initial state.
+This prevents the frontend from defining a different question from the one actually used during settlement.
 
 ---
 
-### `place_bet`
+# Why GenLayer?
 
-Places a YES or NO prediction on an open market.
+Traditional smart contracts cannot directly retrieve arbitrary external web data.
 
-Conceptually:
+Prediction markets, however, often depend on real-world information.
+
+For example:
 
 ```text
-place_bet(
-    market_id,
-    side,
-    amount
-)
+Will BTC be above $120,000 at the deadline?
 ```
 
-The contract updates both the global market pools and the user's position.
+The contract needs an external source to determine the historical BTC price around the exact deadline.
 
-Supported sides:
+Prediction Ledger uses GenLayer's non-deterministic execution model to retrieve external evidence and have validators independently verify the result.
+
+The resolution flow therefore becomes:
+
+```text
+Market
+   ↓
+Stored deadline
+   ↓
+Historical external data source
+   ↓
+Leader retrieves evidence
+   ↓
+Validators independently verify evidence
+   ↓
+Consensus
+   ↓
+YES / NO outcome
+   ↓
+Persisted resolution evidence
+```
+
+---
+
+# Core Features
+
+## 1. Market Creation
+
+Users can create a new prediction market by specifying:
+
+* Asset
+* Price threshold
+* Deadline
+
+Supported assets:
+
+```text
+BTC
+ETH
+SOL
+```
+
+The contract maps each asset to its corresponding CoinGecko identifier.
+
+```text
+BTC → bitcoin
+ETH → ethereum
+SOL → solana
+```
+
+The market question is generated directly by the contract.
+
+For example:
+
+```text
+Will Bitcoin (BTC) be above $120000 at the market deadline?
+```
+
+This ensures that the displayed question corresponds to the actual settlement rule.
+
+---
+
+# 2. YES / NO Positions
+
+Users can place a position on either:
 
 ```text
 YES
 NO
 ```
 
----
+The bet amount is transferred through the payable contract method.
 
-### `get_market`
+Each user's position is tracked independently for each market.
 
-Returns the stored information for a specific market.
+The contract stores:
 
-This is used by the frontend to display the market state.
-
----
-
-### `get_position`
-
-Returns the current user's position for a market.
-
-The position contains the user's YES/NO exposure and total amount.
+* YES amount
+* NO amount
+* User position
+* Market pools
 
 ---
 
-### `get_odds`
+# 3. Deadline-Based Betting Lock
 
-Calculates the current market distribution based on the YES and NO pools.
+Markets are only open for betting before their deadline.
 
-This allows the frontend to present the current market probabilities/odds.
+Once:
+
+```text
+current_time >= deadline
+```
+
+the market can no longer accept new positions.
+
+The frontend also disables the betting interface after the deadline.
+
+This includes:
+
+* YES
+* NO
+* Buy/Sell controls
+* Bet amount
+* Place Bet
+
+The contract independently enforces the deadline as well, so the frontend is not the security boundary.
+
+---
+
+# 4. Independent Market Countdown
+
+Every market card has its own countdown.
+
+The frontend continuously calculates:
+
+```text
+deadline - current_time
+```
+
+and displays the remaining time.
+
+When a market expires, its betting controls become locked and the market becomes eligible for resolution.
+
+This is handled separately for each market rather than using one global countdown for all markets.
+
+---
+
+# 5. Historical Price Resolution
+
+The resolution mechanism does not simply query the current cryptocurrency price.
+
+Instead, it constructs a historical CoinGecko API request based on the **stored market deadline**.
+
+The evidence source follows the structure:
+
+```text
+https://api.coingecko.com/api/v3/coins/{coin_id}/market_chart/range
+```
+
+The requested range covers approximately:
+
+```text
+deadline - 24 hours
+```
+
+to:
+
+```text
+deadline + 24 hours
+```
+
+The contract then searches the returned historical observations and selects the observation closest to the stored deadline.
+
+---
+
+# 6. Evidence Is Bound to the Market Deadline
+
+A key part of the resolution architecture is that the external evidence is not arbitrary.
+
+The contract stores:
+
+```text
+asset
+coin_id
+threshold
+deadline
+source
+```
+
+During resolution, the contract reconstructs the expected source from the stored values.
+
+The resolution process checks that the source corresponds to the market's:
+
+* Asset
+* Coin ID
+* Deadline
+
+This prevents the resolution process from silently switching to an unrelated asset or time period.
+
+---
+
+# 7. Observation-Time Validation
+
+The selected historical observation contains:
+
+```text
+price
+observed_at
+distance_seconds
+```
+
+The contract verifies that the observation is sufficiently close to the market deadline.
+
+The current maximum allowed distance is:
+
+```text
+3600 seconds
+```
+
+or approximately one hour.
+
+Therefore, a historical observation that is too far away from the deadline cannot be accepted as valid settlement evidence.
+
+---
+
+# 8. Validator-Based Verification
+
+The leader retrieves the historical data.
+
+Validators do not simply trust the leader's final YES/NO answer.
+
+Instead, validators independently:
+
+1. Check the stored market parameters.
+2. Check the asset.
+3. Check the CoinGecko coin ID.
+4. Check the deadline.
+5. Check the expected source.
+6. Retrieve the external historical data.
+7. Extract their own closest observation.
+8. Check the observation timestamp.
+9. Compare the observed price.
+10. Independently calculate the YES/NO outcome.
+
+The validator therefore verifies the **evidence behind the outcome**, rather than merely verifying that the leader returned an allowed label.
+
+Conceptually:
+
+```text
+Leader
+  │
+  ├── external historical data
+  ├── observed price
+  ├── observation timestamp
+  └── calculated outcome
+          │
+          ▼
+      Validators
+          │
+          ├── independently fetch data
+          ├── independently find observation
+          ├── verify timestamp
+          ├── verify price
+          └── independently calculate outcome
+                  │
+                  ▼
+               Consensus
+```
+
+---
+
+# 9. Price Tolerance
+
+Because external historical APIs can expose slightly different numeric representations, the contract uses a small price tolerance when comparing independently retrieved observations.
+
+The configured tolerance is:
+
+```text
+0.2%
+```
+
+with a minimum absolute tolerance of:
+
+```text
+$0.50
+```
+
+This is used to compare independently retrieved evidence while still requiring the observations to represent essentially the same historical market price.
+
+---
+
+# 10. Deterministic Outcome Rule
+
+The settlement rule itself is intentionally simple.
+
+For a market with:
+
+```text
+price > threshold
+```
+
+the outcome is:
+
+```text
+YES
+```
+
+Otherwise:
+
+```text
+NO
+```
+
+The same rule is used by the leader and validators.
+
+Example:
+
+```text
+Threshold: $120,000
+Observed price: $121,500
+
+121,500 > 120,000
+
+Outcome: YES
+```
+
+---
+
+# 11. Persisted Resolution Evidence
+
+After successful consensus, the contract stores the resolution evidence.
+
+The persisted evidence includes information such as:
+
+```text
+asset
+coin_id
+deadline
+source
+observed_at
+price
+distance_seconds
+outcome
+```
+
+The frontend can retrieve this evidence and display it in the market detail view.
+
+This provides a provenance trail connecting:
+
+```text
+Market
+→ Deadline
+→ External source
+→ Historical observation
+→ Price
+→ Outcome
+```
+
+---
+
+# 12. Market Status
+
+Markets move through a simple lifecycle:
+
+```text
+OPEN
+  ↓
+Deadline reached
+  ↓
+RESOLUTION
+  ↓
+RESOLVED
+```
+
+A resolved market contains its final:
+
+* Outcome
+* Verification state
+* Resolution timestamp
+* Historical evidence
+
+---
+
+# 13. Claiming Winnings
+
+After a market has been successfully resolved and verified, users holding the winning position can claim their proportional payout.
+
+The payout is calculated from the winning pool and the user's winning position.
+
+The contract also records whether a user has already claimed.
+
+This prevents the same position from being claimed more than once.
+
+---
+
+# Smart Contract
+
+The main contract is implemented in:
+
+```text
+contract.py
+```
+
+The contract exposes the following main methods.
+
+## Write Methods
+
+### `create_market`
+
+Creates a new prediction market.
+
+Parameters:
+
+```text
+asset
+threshold
+deadline
+```
+
+---
+
+### `place_bet`
+
+Places a YES or NO position.
+
+Parameters:
+
+```text
+market_id
+side
+```
+
+The payment amount is supplied through the payable transaction value.
 
 ---
 
 ### `resolve_market`
 
-Attempts to resolve a market after its deadline.
+Resolves an expired market.
 
-The resolution process uses GenLayer's nondeterministic execution and validator consensus to retrieve and verify the external information required to determine the outcome.
+The method:
+
+1. Loads the stored market.
+2. Verifies that the deadline has passed.
+3. Builds the expected historical evidence source.
+4. Retrieves historical price data.
+5. Selects the observation closest to the deadline.
+6. Calculates the outcome.
+7. Runs validator verification.
+8. Stores the final resolution evidence.
 
 ---
+
+### `claim`
+
+Allows a winner to claim their payout after successful resolution.
+
+---
+
+## Read Methods
+
+### `get_market`
+
+Returns the complete market state.
+
+### `get_position`
+
+Returns a user's position in a specific market.
+
+### `has_claimed`
+
+Checks whether a user has already claimed winnings.
+
+### `get_counter`
+
+Returns the current market counter.
 
 ### `get_latest_id`
 
-Returns the latest market identifier.
+Returns the latest market ID.
 
-This is used by the frontend when discovering available markets.
+### `list_markets`
+
+Returns the available market IDs.
+
+### `get_odds`
+
+Returns the current YES/NO market distribution.
+
+### `get_resolution_evidence`
+
+Returns the persisted evidence used during resolution.
 
 ---
 
-# Consensus-Based Resolution
+# Storage Architecture
 
-The most important part of Prediction Ledger is the resolution mechanism.
-
-A prediction market cannot rely only on information supplied by the user because the user may have an incentive to provide incorrect information.
-
-The contract therefore uses GenLayer's consensus capabilities.
-
-The resolution process conceptually follows:
+The contract maintains persistent state for:
 
 ```text
-Market reaches deadline
-        │
-        ▼
-Resolve request
-        │
-        ▼
-Leader retrieves external evidence
-        │
-        ▼
-Validators independently verify
-the relevant asset and outcome
-        │
-        ▼
-Consensus
-        │
-        ▼
-Outcome stored on-chain
+counter
+markets
+positions
+claims
+market_ids
 ```
 
-For cryptocurrency markets, the resolution source is based on CoinGecko's price data.
+Markets and user positions are stored using GenLayer persistent storage structures.
 
-The intended resolution question is equivalent to:
-
-```text
-Was the specified asset above the specified
-threshold when the market reached its deadline?
-```
-
-The contract does not simply trust the frontend's displayed price.
-
----
-
-# Validation Logic
-
-The resolution logic is designed to validate the substantive result rather than merely accepting an arbitrary value.
-
-Validators check the relevant:
-
-* Asset
-* Target threshold
-* External data
-* Reported outcome
-* Price consistency
-
-The contract uses a tolerance for comparing independently retrieved market prices so that small differences between data retrievals do not unnecessarily cause disagreement.
-
-The goal is to make the consensus result robust to normal differences in external API responses while still rejecting materially inconsistent evidence.
-
----
-
-# Supported Assets
-
-The current application focuses on:
-
-| Symbol | Asset    |
-| ------ | -------- |
-| BTC    | Bitcoin  |
-| ETH    | Ethereum |
-| SOL    | Solana   |
-
-The frontend also uses CoinGecko asset identifiers to obtain current market information.
+Each market stores the data necessary to reproduce and verify its settlement conditions.
 
 ---
 
 # Frontend
 
-The frontend is implemented as a lightweight single-page application:
+The frontend is implemented as a lightweight static web application.
+
+The current frontend is intentionally simple and does not require a traditional backend server.
+
+It provides:
+
+* Wallet connection
+* Market list
+* Market creation
+* Market cards
+* Individual market countdowns
+* YES/NO selection
+* Bet amount
+* Position information
+* Market odds
+* Resolution controls
+* Historical price chart
+* Resolution evidence
+* Claim interface
+* Responsive layout
+
+---
+
+# Market Charts
+
+Each market displays a chart corresponding to its underlying asset.
+
+For example:
 
 ```text
-frontend/index.html
+BTC Market → BTC price chart
+ETH Market → ETH price chart
+SOL Market → SOL price chart
 ```
 
-It uses:
+For active markets, the frontend displays recent market-price information.
+
+For expired or resolved markets, the chart can show historical information around the market deadline and the threshold used by the prediction.
+
+This makes it easier to visually understand the relationship between:
+
+```text
+Price
+Threshold
+Deadline
+Outcome
+```
+
+---
+
+# Frontend Configuration
+
+The frontend uses a fixed GenLayer configuration.
+
+```javascript
+const FIXED_CONFIG = Object.freeze({
+  address: "0x1C011f310166CB73aD36A9E02b33519D72c9f160",
+  rpc: "https://studio.genlayer.com/api",
+  chainId: "61999"
+});
+```
+
+The contract address is therefore not dependent on users entering configuration values manually.
+
+---
+
+# Technology Stack
+
+## Smart Contract
+
+* Python
+* GenLayer
+* GenLayer non-deterministic execution
+* GenLayer validator consensus
+* Persistent contract storage
+
+## External Data
+
+* CoinGecko historical market data API
+
+## Frontend
 
 * HTML
 * CSS
 * JavaScript
+* Canvas-based charts
 * `genlayer-js`
 
-The GenLayer JavaScript SDK is loaded through jsDelivr.
+## Deployment
 
-The current implementation uses:
-
-```text
-genlayer-js 1.1.8
-```
-
-The frontend provides:
-
-* Wallet connection
-* Market discovery
-* Market creation
-* YES/NO prediction placement
-* User position display
-* Market odds
-* Market status
-* Market resolution
-* Cryptocurrency price display
+* GenLayer Studio / Studionet
+* Vercel
 
 ---
 
-# Network Configuration
+# Security and Architecture Considerations
 
-The current deployed contract is on **GenLayer Studionet**.
+Prediction markets depend heavily on correct settlement data.
 
-```text
-Network: GenLayer Studionet
-Chain ID: 61999
-RPC: https://studio.genlayer.com/api
-```
+Prediction Ledger therefore separates several responsibilities:
 
-Current contract:
+### Contract State
+
+The contract stores the market's actual:
 
 ```text
-0x97eCfbE5b74ABd4848B083b4EBf1443626c4c107
+asset
+threshold
+deadline
 ```
 
-The production frontend is intended to use these values directly rather than requiring users to manually configure the contract address or RPC.
+### Evidence Source
+
+The historical source is constructed from those stored values.
+
+### Leader
+
+The leader retrieves external data and proposes the resolution evidence.
+
+### Validators
+
+Validators independently retrieve and verify the evidence.
+
+### Consensus
+
+The result is only persisted after the GenLayer nondeterministic execution reaches the required consensus.
+
+### Frontend
+
+The frontend provides usability and visualization but does not determine the final market outcome.
+
+This means that changing frontend text cannot change the contract's settlement rule.
 
 ---
 
-# Local Development
+# Example Market
+
+Suppose a user creates:
+
+```text
+Asset:
+BTC
+
+Threshold:
+$120,000
+
+Deadline:
+Market-specific timestamp
+```
+
+The contract generates:
+
+```text
+Will Bitcoin (BTC) be above $120000 at the market deadline?
+```
+
+When the deadline passes, the contract retrieves historical BTC price observations around that exact deadline.
+
+Suppose the closest valid observation is:
+
+```text
+Observed price:
+$121,500
+```
+
+The contract evaluates:
+
+```text
+121,500 > 120,000
+```
+
+Therefore:
+
+```text
+YES
+```
+
+The validators independently verify the evidence and outcome.
+
+After successful consensus, the contract stores the resolution evidence on-chain.
+
+---
+
+# Resolution Flow
+
+The complete settlement path is:
+
+```text
+1. User creates market
+        ↓
+2. Contract stores asset / threshold / deadline
+        ↓
+3. Contract generates question
+        ↓
+4. Users place YES / NO positions
+        ↓
+5. Deadline passes
+        ↓
+6. Betting becomes locked
+        ↓
+7. resolve_market() is called
+        ↓
+8. Contract reconstructs historical source
+        ↓
+9. Leader retrieves historical data
+        ↓
+10. Closest observation to deadline is selected
+        ↓
+11. Leader calculates YES / NO
+        ↓
+12. Validators independently retrieve evidence
+        ↓
+13. Validators verify timestamp and price
+        ↓
+14. Validators independently calculate outcome
+        ↓
+15. GenLayer reaches consensus
+        ↓
+16. Resolution evidence is persisted
+        ↓
+17. Winning users can claim
+```
+
+---
+
+# Milestone / New Progress
+
+Prediction Ledger has evolved beyond the initial prediction-market implementation.
+
+The current version introduces a substantially more verifiable settlement architecture.
+
+The main improvements include:
+
+### Deadline-bound resolution
+
+Resolution evidence is tied to the market's stored deadline rather than relying on a generic current-price query.
+
+### Historical evidence
+
+The contract retrieves historical market observations around the relevant settlement time.
+
+### Observation validation
+
+Validators check not only the outcome but also the observation timestamp and price.
+
+### Contract-bound market questions
+
+The displayed market question is generated from the same asset and threshold stored by the contract.
+
+### Persistent provenance
+
+Resolution evidence is persisted so that the frontend can display how the final outcome was determined.
+
+### New deployment
+
+The updated contract is deployed on GenLayer with the current address:
+
+```text
+0x1C011f310166CB73aD36A9E02b33519D72c9f160
+```
+
+### Improved frontend
+
+The frontend now includes independent market countdowns, deadline-based betting locks, per-market asset charts, and resolution evidence visualization.
+
+These changes make the project more than a basic prediction-market interface: the focus is now on **verifiable, deadline-bound, externally sourced market settlement using GenLayer's validator model**.
+
+---
+
+# Running the Frontend Locally
 
 Clone the repository:
 
@@ -370,28 +849,39 @@ Clone the repository:
 git clone https://github.com/mahdizangi7/prediction-ledger.git
 ```
 
-Enter the project:
+Enter the frontend directory:
 
 ```bash
 cd prediction-ledger
 ```
 
-The frontend is contained in:
-
-```text
-frontend/
-```
-
-Run a local static server from the frontend directory.
+The frontend is a static application and can be served with any simple local HTTP server.
 
 For example:
 
 ```bash
-cd frontend
 npx serve .
 ```
 
-Then open the local URL shown by the server.
+Then open the local address shown by the server.
+
+---
+
+# Deployment
+
+The production frontend is deployed through Vercel.
+
+Typical deployment command:
+
+```bash
+npx vercel --prod
+```
+
+The deployed application is:
+
+```text
+https://peridiction-ledger.vercel.app
+```
 
 ---
 
@@ -400,118 +890,82 @@ Then open the local URL shown by the server.
 ```text
 prediction-ledger/
 │
-├── contracts/
-│   └── prediction_market.py
-│
-├── frontend/
-│   ├── index.html
-│   └── .gitignore
-│
-├── scripts/
-│   └── time_probe.py
-│
-├── .gitignore
+├── contract.py
+├── index.html
 └── README.md
 ```
 
+The exact repository structure may contain additional project files depending on the deployment environment.
+
 ---
 
-# Contract Deployment
-
-The Intelligent Contract is deployed through **GenLayer Studio**.
-
-The contract source is:
+# Current Contract
 
 ```text
-contracts/prediction_market.py
-```
+Network: GenLayer Studio / Studionet
+Chain ID: 61999
 
-After deployment, the resulting contract address is configured in the frontend.
+Contract:
+0x1C011f310166CB73aD36A9E02b33519D72c9f160
 
-Current deployment:
-
-```text
-0x97eCfbE5b74ABd4848B083b4EBf1443626c4c107
+RPC:
+https://studio.genlayer.com/api
 ```
 
 ---
 
-# Security and Trust Model
+# Status
 
-Prediction Ledger separates three different responsibilities:
+Prediction Ledger currently demonstrates:
 
-### 1. Frontend
-
-The frontend provides the user interface and submits transactions.
-
-It is not the source of truth for the final market outcome.
-
-### 2. Smart Contract
-
-The Intelligent Contract stores market state and user positions and controls the market lifecycle.
-
-### 3. GenLayer Consensus
-
-External information used for settlement is evaluated through GenLayer's validator consensus.
-
-This separation reduces reliance on a centralized application backend.
-
----
-
-# Limitations
-
-This project is an experimental prediction-market implementation.
-
-Important limitations include:
-
-* The current deployment uses GenLayer Studionet.
-* External data depends on the availability of the selected data source.
-* Cryptocurrency prices can differ slightly between data providers.
-* The current market examples focus on BTC, ETH, and SOL.
-* Production economic mechanisms such as sophisticated liquidity incentives, dispute markets, and advanced payout accounting can be extended in future versions.
+* [x] GenLayer smart contract
+* [x] Real deployed contract
+* [x] BTC / ETH / SOL markets
+* [x] Contract-generated market questions
+* [x] YES / NO positions
+* [x] Payable betting
+* [x] Deadline enforcement
+* [x] Independent market countdowns
+* [x] Historical external price evidence
+* [x] Deadline-bound evidence
+* [x] Validator-based evidence verification
+* [x] Observation timestamp verification
+* [x] Price verification
+* [x] Deterministic YES / NO settlement rule
+* [x] Persisted resolution evidence
+* [x] Claim functionality
+* [x] Per-market price charts
+* [x] Responsive frontend
+* [x] Vercel deployment
 
 ---
 
-# Future Extensions
+# Conclusion
 
-Potential extensions include:
+Prediction Ledger demonstrates how GenLayer can be used to build prediction markets whose settlement depends on real-world information.
 
-* More supported assets
-* More external data providers
-* Multi-source evidence verification
-* Event-based markets beyond cryptocurrency
-* More sophisticated payout mechanisms
-* Market liquidity mechanisms
-* Historical market analytics
-* Market creation permissions
-* Dispute and challenge mechanisms
-* Additional validator consistency checks
-* Automated market lifecycle management
-
----
-
-# Design Goal
-
-Prediction Ledger is intended to demonstrate a reusable GenLayer primitive:
-
-> **A prediction market whose real-world outcome can be determined through decentralized consensus rather than a single centralized oracle.**
-
-The project focuses on combining:
+Instead of treating an external API response as unquestioned truth, the application creates a verifiable resolution path:
 
 ```text
-On-chain state
-+
-Real-world data
-+
-GenLayer consensus
-+
-User predictions
-=
-Decentralized real-world settlement
+Stored Market Conditions
+        ↓
+Historical External Evidence
+        ↓
+Leader Retrieval
+        ↓
+Independent Validator Retrieval
+        ↓
+Evidence Verification
+        ↓
+Consensus
+        ↓
+On-chain Resolution
 ```
+
+The result is a prediction-market architecture where the **market definition, settlement deadline, external evidence, validator verification, and final outcome are connected throughout the resolution process**.
 
 ---
 
-# License
+## License
 
-This repository is provided for experimentation, education, and development around GenLayer Intelligent Contracts.
+This project is provided for demonstration and development purposes.
