@@ -1,2502 +1,3264 @@
 <!DOCTYPE html>
-<html lang="en" dir="ltr">
+<html lang="en">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Prediction Ledger</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <title>Prediction Ledger</title>
 
-<style>
-  :root{
-    --slate-900:#0f1b16;
-    --slate-800:#16261f;
-    --slate-700:#1e352b;
-    --slate-600:#2b4638;
-    --chalk-line:#3d5c4b;
-    --chalk:#eef2ea;
-    --chalk-dim:#a9bdb0;
-    --gold:#d9a441;
-    --gold-dim:#8a6d2e;
-    --rust:#c05a42;
-    --rust-dim:#7d3d2c;
-    --radius:3px;
-    --font-display:'Fraunces', Georgia, serif;
-    --font-ui:'Inter', -apple-system, 'Segoe UI', sans-serif;
-    --font-num:'IBM Plex Mono', ui-monospace, 'Courier New', monospace;
-  }
-
-  *{box-sizing:border-box;}
-  html,body{margin:0;padding:0;}
-
-  body{
-    background:
-      radial-gradient(ellipse at 20% -10%, rgba(217,164,65,0.06), transparent 45%),
-      var(--slate-900);
-    color:var(--chalk);
-    font-family:var(--font-ui);
-    line-height:1.6;
-    min-height:100vh;
-  }
-
-  .num{font-family:var(--font-num);}
-  a{color:inherit;}
-
-  ::selection{
-    background:var(--gold);
-    color:var(--slate-900);
-  }
-
-  .shell{
-    max-width:1180px;
-    margin:0 auto;
-    padding:22px 20px 80px;
-  }
-
-  header.top{
-    display:flex;
-    align-items:flex-end;
-    justify-content:space-between;
-    gap:16px;
-    padding-bottom:18px;
-    margin-bottom:22px;
-    border-bottom:1px solid var(--chalk-line);
-    flex-wrap:wrap;
-  }
-
-  header.top .brand h1{
-    margin:0;
-    font-family:var(--font-display);
-    font-size:27px;
-    font-weight:600;
-    letter-spacing:.2px;
-  }
-
-  header.top .brand p{
-    margin:4px 0 0;
-    color:var(--chalk-dim);
-    font-size:13.5px;
-  }
-
-  .top-actions{
-    display:flex;
-    align-items:center;
-    gap:10px;
-  }
-
-  .pill{
-    display:inline-flex;
-    align-items:center;
-    gap:6px;
-    border:1px solid var(--chalk-line);
-    border-radius:999px;
-    padding:5px 12px;
-    font-size:12.5px;
-    color:var(--chalk-dim);
-  }
-
-  .pill .dot{
-    width:7px;
-    height:7px;
-    border-radius:50%;
-    background:var(--chalk-dim);
-  }
-
-  .pill.live .dot{
-    background:var(--gold);
-  }
-
-  button{
-    font-family:inherit;
-    cursor:pointer;
-    border:1px solid var(--chalk-line);
-    background:var(--slate-800);
-    color:var(--chalk);
-    border-radius:var(--radius);
-    padding:9px 16px;
-    font-size:14px;
-    transition:border-color .15s ease, background .15s ease;
-  }
-
-  button:hover:not(:disabled){
-    border-color:var(--gold-dim);
-  }
-
-  button:focus-visible{
-    outline:2px solid var(--gold);
-    outline-offset:2px;
-  }
-
-  button:disabled{
-    opacity:.4;
-    cursor:not-allowed;
-  }
-
-  button.primary{
-    background:var(--gold);
-    color:var(--slate-900);
-    border-color:var(--gold);
-    font-weight:600;
-  }
-
-  button.primary:hover:not(:disabled){
-    background:#e6b658;
-  }
-
-  button.danger{
-    border-color:var(--rust-dim);
-    color:#e6a08c;
-  }
-
-  button.danger:hover:not(:disabled){
-    border-color:var(--rust);
-  }
-
-  button.ghost{
-    background:transparent;
-  }
-
-  button.small{
-    padding:5px 10px;
-    font-size:12.5px;
-  }
-
-  input,select{
-    font-family:inherit;
-    background:var(--slate-800);
-    color:var(--chalk);
-    border:1px solid var(--chalk-line);
-    border-radius:var(--radius);
-    padding:9px 11px;
-    font-size:14px;
-    width:100%;
-  }
-
-  input:focus,select:focus{
-    outline:2px solid var(--gold);
-    outline-offset:1px;
-  }
-
-  label{
-    display:block;
-    font-size:12.5px;
-    color:var(--chalk-dim);
-    margin-bottom:5px;
-  }
-
-  .field{
-    margin-bottom:14px;
-  }
-
-  .row2{
-    display:grid;
-    grid-template-columns:1fr 1fr;
-    gap:12px;
-  }
-
-  .board{
-    display:grid;
-    grid-template-columns:340px 1fr;
-    gap:20px;
-    align-items:start;
-  }
-
-  @media (max-width:860px){
-    .board{
-      grid-template-columns:1fr;
+  <style>
+    * {
+      box-sizing: border-box;
     }
-  }
 
-  .panel{
-    background:var(--slate-800);
-    border:1px solid var(--chalk-line);
-    border-radius:6px;
-    padding:18px;
-  }
-
-  .panel h2{
-    margin:0 0 14px;
-    font-size:15px;
-    font-weight:600;
-    color:var(--chalk-dim);
-  }
-
-  .market-row{
-    display:block;
-    width:100%;
-    text-align:left;
-    background:transparent;
-    border:1px solid transparent;
-    border-bottom:1px solid var(--chalk-line);
-    border-radius:0;
-    padding:12px 6px;
-    margin:0;
-  }
-
-  .market-row:first-child{
-    border-top:1px solid var(--chalk-line);
-  }
-
-  .market-row:hover{
-    background:var(--slate-700);
-  }
-
-  .market-row.active{
-    background:var(--slate-700);
-    border-color:var(--gold-dim);
-  }
-
-  .market-row .q{
-    font-size:13.5px;
-    margin-bottom:6px;
-  }
-
-  .market-row .meta{
-    display:flex;
-    justify-content:space-between;
-    font-size:11.5px;
-    color:var(--chalk-dim);
-  }
-
-  .status-tag{
-    font-size:10.5px;
-    padding:1px 7px;
-    border-radius:999px;
-    border:1px solid var(--chalk-line);
-  }
-
-  .status-tag.open{
-    color:var(--gold);
-    border-color:var(--gold-dim);
-  }
-
-  .status-tag.resolved{
-    color:#8fd0a8;
-    border-color:#3d6b4c;
-  }
-
-  .status-tag.void{
-    color:var(--chalk-dim);
-  }
-
-  .odds-board{
-    display:flex;
-    align-items:stretch;
-    gap:14px;
-    margin:18px 0 20px;
-  }
-
-  .odds-face{
-    flex:1;
-    border:1px solid var(--chalk-line);
-    border-radius:6px;
-    padding:16px;
-    text-align:center;
-    background:var(--slate-700);
-  }
-
-  .odds-face.yes{
-    border-color:var(--gold-dim);
-  }
-
-  .odds-face.no{
-    border-color:var(--rust-dim);
-  }
-
-  .odds-face .label{
-    font-size:12px;
-    color:var(--chalk-dim);
-    margin-bottom:6px;
-    letter-spacing:.3px;
-  }
-
-  .odds-face .pct{
-    font-size:38px;
-    font-weight:600;
-    font-family:var(--font-num);
-  }
-
-  .odds-face.yes .pct{
-    color:var(--gold);
-  }
-
-  .odds-face.no .pct{
-    color:var(--rust);
-  }
-
-  .odds-face .pool{
-    font-size:12px;
-    color:var(--chalk-dim);
-    margin-top:4px;
-  }
-
-  .bar{
-    height:6px;
-    border-radius:999px;
-    overflow:hidden;
-    background:var(--rust-dim);
-    margin-top:8px;
-  }
-
-  .bar > div{
-    height:100%;
-    background:var(--gold);
-  }
-
-  .kv{
-    display:flex;
-    justify-content:space-between;
-    padding:7px 0;
-    border-bottom:1px dashed var(--chalk-line);
-    font-size:13px;
-    gap:15px;
-  }
-
-  .kv:last-child{
-    border-bottom:none;
-  }
-
-  .kv .k{
-    color:var(--chalk-dim);
-  }
-
-  .tabs{
-    display:flex;
-    gap:6px;
-    margin-bottom:14px;
-    border-bottom:1px solid var(--chalk-line);
-  }
-
-  .tabs button{
-    border:none;
-    background:none;
-    border-radius:0;
-    padding:8px 4px;
-    margin-right:14px;
-    color:var(--chalk-dim);
-  }
-
-  .tabs button.active{
-    color:var(--gold);
-    border-bottom:2px solid var(--gold);
-  }
-
-  .empty{
-    color:var(--chalk-dim);
-    font-size:13px;
-    text-align:center;
-    padding:30px 10px;
-  }
-
-  .overlay{
-    position:fixed;
-    inset:0;
-    background:rgba(6,10,8,.7);
-    display:none;
-    align-items:center;
-    justify-content:center;
-    z-index:50;
-    padding:20px;
-  }
-
-  .overlay.show{
-    display:flex;
-  }
-
-  .modal{
-    background:var(--slate-800);
-    border:1px solid var(--chalk-line);
-    border-radius:8px;
-    padding:22px;
-    width:100%;
-    max-width:440px;
-    max-height:88vh;
-    overflow:auto;
-  }
-
-  .modal h3{
-    margin:0 0 16px;
-    font-family:var(--font-display);
-    font-size:18px;
-    font-weight:600;
-  }
-
-  .modal-actions{
-    display:flex;
-    gap:10px;
-    margin-top:18px;
-    justify-content:flex-start;
-  }
-
-  .toasts{
-    position:fixed;
-    bottom:16px;
-    left:16px;
-    z-index:60;
-    display:flex;
-    flex-direction:column;
-    gap:8px;
-    max-width:360px;
-  }
-
-  .toast{
-    background:var(--slate-800);
-    border:1px solid var(--chalk-line);
-    border-left:3px solid var(--gold);
-    border-radius:5px;
-    padding:11px 14px;
-    font-size:13px;
-    box-shadow:0 6px 18px rgba(0,0,0,.35);
-  }
-
-  .toast.err{
-    border-left-color:var(--rust);
-  }
-
-  .toast.ok{
-    border-left-color:#5fae7c;
-  }
-
-  .toast .t-title{
-    font-weight:600;
-    margin-bottom:2px;
-  }
-
-  .toast .t-body{
-    color:var(--chalk-dim);
-    font-size:12px;
-    word-break:break-word;
-  }
-
-  .hint{
-    font-size:11.5px;
-    color:var(--chalk-dim);
-    margin-top:5px;
-  }
-
-  .divider{
-    height:1px;
-    background:var(--chalk-line);
-    margin:16px 0;
-  }
-
-  footer{
-    text-align:center;
-    color:var(--chalk-dim);
-    font-size:11.5px;
-    margin-top:40px;
-  }
-
-  details.debug{
-    margin-top:20px;
-  }
-
-  details.debug summary{
-    cursor:pointer;
-    color:var(--chalk-dim);
-    font-size:12px;
-  }
-
-  details.debug pre{
-    background:var(--slate-900);
-    border:1px solid var(--chalk-line);
-    border-radius:5px;
-    padding:10px;
-    font-size:11px;
-    max-height:220px;
-    overflow:auto;
-    text-align:left;
-  }
-
-  /* =========================================================
-     MARKET PRICE CHART
-     ========================================================= */
-
-  .market-chart-wrap{
-    display:grid;
-    grid-template-columns:minmax(0, 1fr) 250px;
-    gap:18px;
-    margin:18px 0 20px;
-    align-items:stretch;
-  }
-
-  @media (max-width:900px){
-    .market-chart-wrap{
-      grid-template-columns:1fr;
+    html,
+    body {
+      margin: 0;
+      padding: 0;
+      min-height: 100%;
+      font-family:
+        Inter,
+        ui-sans-serif,
+        system-ui,
+        -apple-system,
+        BlinkMacSystemFont,
+        "Segoe UI",
+        sans-serif;
+      background:
+        radial-gradient(circle at top left, rgba(39, 88, 58, 0.18), transparent 35%),
+        #07110d;
+      color: #edf5ef;
     }
-  }
 
-  .price-chart-card{
-    background:var(--slate-900);
-    border:1px solid var(--chalk-line);
-    border-radius:6px;
-    padding:14px;
-    min-width:0;
-  }
+    body {
+      min-height: 100vh;
+    }
 
-  .price-chart-head{
-    display:flex;
-    justify-content:space-between;
-    align-items:flex-start;
-    gap:12px;
-    margin-bottom:10px;
-  }
+    button,
+    input,
+    select {
+      font: inherit;
+    }
 
-  .price-chart-title{
-    font-size:13px;
-    color:var(--chalk-dim);
-  }
+    button {
+      cursor: pointer;
+    }
 
-  .price-chart-current{
-    font-family:var(--font-num);
-    font-size:18px;
-    color:var(--chalk);
-    font-weight:600;
-  }
+    .container {
+      width: min(1180px, calc(100% - 32px));
+      margin: 0 auto;
+    }
 
-  .price-chart-sub{
-    font-size:11px;
-    color:var(--chalk-dim);
-    margin-top:2px;
-  }
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      border-bottom: 1px solid rgba(255,255,255,0.07);
+      background: rgba(5, 14, 10, 0.88);
+      backdrop-filter: blur(18px);
+    }
 
-  .price-chart{
-    position:relative;
-    width:100%;
-    height:230px;
-    overflow:hidden;
-  }
+    .header-inner {
+      min-height: 76px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+    }
 
-  .price-chart svg{
-    display:block;
-    width:100%;
-    height:100%;
-  }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+    }
 
-  .chart-grid-line{
-    stroke:var(--chalk-line);
-    stroke-width:1;
-    stroke-dasharray:3 5;
-    opacity:.65;
-  }
+    .brand-mark {
+      width: 40px;
+      height: 40px;
+      border-radius: 12px;
+      display: grid;
+      place-items: center;
+      background: linear-gradient(135deg, #d5b76c, #8e6c29);
+      color: #09100c;
+      font-weight: 900;
+      box-shadow: 0 8px 30px rgba(213, 183, 108, 0.18);
+    }
 
-  .chart-price-line{
-    fill:none;
-    stroke:var(--gold);
-    stroke-width:2.5;
-    vector-effect:non-scaling-stroke;
-  }
+    .brand-text {
+      display: flex;
+      flex-direction: column;
+      line-height: 1.05;
+    }
 
-  .chart-price-area{
-    fill:var(--gold);
-    opacity:.08;
-  }
+    .brand-title {
+      font-size: 17px;
+    }
 
-  .chart-threshold-line{
-    stroke:var(--rust);
-    stroke-width:1.5;
-    stroke-dasharray:6 5;
-    vector-effect:non-scaling-stroke;
-  }
+    .brand-subtitle {
+      margin-top: 4px;
+      font-size: 11px;
+      color: #829187;
+      font-weight: 500;
+    }
 
-  .chart-label{
-    fill:var(--chalk-dim);
-    font-family:var(--font-num);
-    font-size:11px;
-  }
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
 
-  .chart-threshold-label{
-    fill:#e6a08c;
-    font-family:var(--font-num);
-    font-size:11px;
-  }
+    .btn {
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 10px;
+      padding: 10px 15px;
+      background: #102019;
+      color: #edf5ef;
+      transition: 0.18s ease;
+    }
 
-  .chart-loading{
-    height:100%;
-    min-height:180px;
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    color:var(--chalk-dim);
-    font-size:12px;
-  }
+    .btn:hover {
+      transform: translateY(-1px);
+      border-color: rgba(213,183,108,0.35);
+      background: #14271e;
+    }
 
-  .chart-error{
-    height:100%;
-    min-height:180px;
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    text-align:center;
-    color:var(--chalk-dim);
-    font-size:12px;
-    padding:20px;
-  }
+    .btn-primary {
+      background: linear-gradient(135deg, #d5b76c, #a8863e);
+      color: #0a100c;
+      border-color: transparent;
+      font-weight: 800;
+    }
 
-  .market-chart-stats{
-    display:flex;
-    flex-direction:column;
-    justify-content:center;
-    gap:0;
-  }
+    .btn-primary:hover {
+      background: linear-gradient(135deg, #e2c982, #b9954c);
+    }
 
-  .chart-stat{
-    padding:10px 0;
-    border-bottom:1px dashed var(--chalk-line);
-  }
+    .btn-danger {
+      background: rgba(164, 61, 61, 0.14);
+      color: #ef9c9c;
+      border-color: rgba(220, 80, 80, 0.18);
+    }
 
-  .chart-stat:last-child{
-    border-bottom:none;
-  }
+    .btn-success {
+      background: rgba(47, 142, 91, 0.14);
+      color: #7ee0a4;
+      border-color: rgba(76, 191, 120, 0.18);
+    }
 
-  .chart-stat .k{
-    color:var(--chalk-dim);
-    font-size:11px;
-    margin-bottom:3px;
-  }
+    .btn-small {
+      padding: 7px 11px;
+      font-size: 12px;
+      border-radius: 8px;
+    }
 
-  .chart-stat .v{
-    font-family:var(--font-num);
-    font-size:14px;
-  }
+    .btn:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+      transform: none;
+    }
 
-  .chart-stat.threshold .v{
-    color:var(--rust);
-  }
+    .hero {
+      padding: 58px 0 35px;
+    }
 
-  .chart-stat.asset .v{
-    color:var(--gold);
-  }
-</style>
+    .hero-grid {
+      display: grid;
+      grid-template-columns: 1.35fr 0.65fr;
+      gap: 24px;
+      align-items: stretch;
+    }
+
+    .hero-card {
+      border: 1px solid rgba(255,255,255,0.07);
+      border-radius: 22px;
+      padding: 32px;
+      background:
+        linear-gradient(145deg, rgba(18, 43, 31, 0.88), rgba(8, 19, 14, 0.95));
+      box-shadow: 0 25px 70px rgba(0,0,0,0.2);
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: rgba(213,183,108,0.08);
+      border: 1px solid rgba(213,183,108,0.16);
+      color: #d5b76c;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      margin: 18px 0 12px;
+      font-size: clamp(34px, 5vw, 58px);
+      line-height: 0.98;
+      letter-spacing: -0.055em;
+    }
+
+    .hero-copy {
+      max-width: 680px;
+      color: #9cab9f;
+      font-size: 16px;
+      line-height: 1.7;
+    }
+
+    .hero-buttons {
+      margin-top: 25px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .stats-card {
+      border: 1px solid rgba(255,255,255,0.07);
+      border-radius: 22px;
+      padding: 26px;
+      background: rgba(10, 23, 16, 0.82);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .stat-label {
+      color: #77877c;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .stat-value {
+      margin-top: 8px;
+      font-size: 35px;
+      font-weight: 800;
+      letter-spacing: -0.04em;
+    }
+
+    .network {
+      margin-top: 20px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: #91a096;
+      font-size: 12px;
+    }
+
+    .network-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #66d391;
+      box-shadow: 0 0 12px rgba(102,211,145,0.6);
+    }
+
+    main {
+      padding-bottom: 70px;
+    }
+
+    .section-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: end;
+      gap: 20px;
+      margin-bottom: 18px;
+    }
+
+    .section-title {
+      font-size: 24px;
+      font-weight: 800;
+      letter-spacing: -0.03em;
+    }
+
+    .section-subtitle {
+      margin-top: 5px;
+      color: #718077;
+      font-size: 13px;
+    }
+
+    .markets {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 15px;
+    }
+
+    .market-card {
+      border: 1px solid rgba(255,255,255,0.07);
+      border-radius: 17px;
+      padding: 20px;
+      background: rgba(10, 22, 16, 0.86);
+      transition: 0.18s ease;
+      cursor: pointer;
+    }
+
+    .market-card:hover {
+      transform: translateY(-2px);
+      border-color: rgba(213,183,108,0.25);
+      background: rgba(14, 30, 22, 0.94);
+    }
+
+    .market-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .coin {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      font-weight: 800;
+    }
+
+    .coin img {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+    }
+
+    .status {
+      padding: 5px 8px;
+      border-radius: 999px;
+      font-size: 10px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    .status-open {
+      color: #79dfa1;
+      background: rgba(70, 190, 115, 0.1);
+    }
+
+    .status-resolved {
+      color: #d5b76c;
+      background: rgba(213,183,108,0.1);
+    }
+
+    .market-question {
+      margin-top: 18px;
+      min-height: 53px;
+      font-size: 15px;
+      font-weight: 700;
+      line-height: 1.5;
+    }
+
+    .market-meta {
+      margin-top: 15px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .meta-box {
+      padding: 10px;
+      border-radius: 10px;
+      background: rgba(255,255,255,0.025);
+      border: 1px solid rgba(255,255,255,0.04);
+    }
+
+    .meta-label {
+      font-size: 10px;
+      color: #68776d;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    .meta-value {
+      margin-top: 4px;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .market-footer {
+      margin-top: 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      color: #839188;
+      font-size: 11px;
+    }
+
+    /* NEW: market countdown */
+
+    .market-countdown {
+      margin-top: 12px;
+      padding: 9px 10px;
+      border-radius: 9px;
+      background: rgba(213,183,108,0.045);
+      border: 1px solid rgba(213,183,108,0.08);
+      color: #d5b76c;
+      font-size: 11px;
+      font-weight: 700;
+      text-align: center;
+    }
+
+    .market-countdown.reached {
+      color: #ef9c9c;
+      border-color: rgba(220,80,80,0.16);
+      background: rgba(164,61,61,0.07);
+    }
+
+    .market-countdown.resolved {
+      color: #7ee0a4;
+      border-color: rgba(76,191,120,0.16);
+      background: rgba(47,142,91,0.07);
+    }
+
+    .empty {
+      padding: 40px;
+      border: 1px dashed rgba(255,255,255,0.1);
+      border-radius: 16px;
+      text-align: center;
+      color: #708076;
+      grid-column: 1 / -1;
+    }
+
+    .loading {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 45px;
+      color: #829187;
+    }
+
+    .spinner {
+      width: 18px;
+      height: 18px;
+      border: 2px solid rgba(255,255,255,0.1);
+      border-top-color: #d5b76c;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin-right: 10px;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 100;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      background: rgba(0,0,0,0.72);
+      backdrop-filter: blur(8px);
+    }
+
+    .modal-backdrop.show {
+      display: flex;
+    }
+
+    .modal {
+      width: min(760px, 100%);
+      max-height: calc(100vh - 40px);
+      overflow-y: auto;
+      border: 1px solid rgba(255,255,255,0.09);
+      border-radius: 20px;
+      background: #0b1711;
+      box-shadow: 0 30px 100px rgba(0,0,0,0.5);
+    }
+
+    .modal-head {
+      padding: 20px 22px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+    }
+
+    .modal-title {
+      font-weight: 800;
+      font-size: 18px;
+    }
+
+    .close {
+      width: 34px;
+      height: 34px;
+      border: 0;
+      border-radius: 9px;
+      background: rgba(255,255,255,0.05);
+      color: #9cab9f;
+      font-size: 18px;
+    }
+
+    .modal-body {
+      padding: 22px;
+    }
+
+    .form-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 15px;
+    }
+
+    .form-group {
+      margin-bottom: 15px;
+    }
+
+    .form-group.full {
+      grid-column: 1 / -1;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 7px;
+      color: #91a096;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    input,
+    select {
+      width: 100%;
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 10px;
+      padding: 11px 12px;
+      outline: none;
+      background: #09130e;
+      color: #edf5ef;
+    }
+
+    input:focus,
+    select:focus {
+      border-color: rgba(213,183,108,0.5);
+    }
+
+    input[readonly] {
+      color: #9baaa0;
+      background: rgba(255,255,255,0.025);
+    }
+
+    input:disabled,
+    select:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+
+    .hint {
+      margin-top: 6px;
+      color: #65736a;
+      font-size: 11px;
+      line-height: 1.5;
+    }
+
+    .modal-footer {
+      padding: 17px 22px;
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+      border-top: 1px solid rgba(255,255,255,0.06);
+    }
+
+    .detail-layout {
+      display: grid;
+      grid-template-columns: 1.25fr 0.75fr;
+      gap: 16px;
+    }
+
+    .panel {
+      border: 1px solid rgba(255,255,255,0.07);
+      border-radius: 17px;
+      padding: 20px;
+      background: rgba(10,22,16,0.86);
+    }
+
+    .panel-title {
+      font-weight: 800;
+      font-size: 15px;
+      margin-bottom: 15px;
+    }
+
+    .detail-question {
+      font-size: 23px;
+      line-height: 1.4;
+      font-weight: 800;
+    }
+
+    .detail-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 15px;
+      padding: 11px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.045);
+    }
+
+    .detail-row:last-child {
+      border-bottom: 0;
+    }
+
+    .detail-label {
+      color: #718077;
+      font-size: 12px;
+    }
+
+    .detail-value {
+      text-align: right;
+      max-width: 65%;
+      font-size: 12px;
+      font-weight: 700;
+      word-break: break-word;
+    }
+
+    .odds-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-top: 15px;
+    }
+
+    .odd-box {
+      padding: 15px;
+      border-radius: 12px;
+      background: rgba(255,255,255,0.025);
+    }
+
+    .odd-label {
+      color: #718077;
+      font-size: 11px;
+    }
+
+    .odd-value {
+      margin-top: 5px;
+      font-size: 25px;
+      font-weight: 800;
+    }
+
+    .tabs {
+      display: flex;
+      gap: 7px;
+      overflow-x: auto;
+      padding-bottom: 5px;
+      margin-bottom: 15px;
+    }
+
+    .tab {
+      white-space: nowrap;
+      border: 1px solid rgba(255,255,255,0.06);
+      background: rgba(255,255,255,0.025);
+      color: #87958b;
+      padding: 8px 11px;
+      border-radius: 9px;
+      font-size: 11px;
+    }
+
+    .tab.active {
+      color: #d5b76c;
+      border-color: rgba(213,183,108,0.25);
+      background: rgba(213,183,108,0.07);
+    }
+
+    .tab-content {
+      display: none;
+    }
+
+    .tab-content.active {
+      display: block;
+    }
+
+    .bet-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .side-btn {
+      padding: 14px;
+      border-radius: 11px;
+      border: 1px solid rgba(255,255,255,0.07);
+      background: rgba(255,255,255,0.025);
+      color: #93a097;
+      font-weight: 800;
+    }
+
+    .side-btn.active {
+      border-color: rgba(213,183,108,0.4);
+      color: #d5b76c;
+      background: rgba(213,183,108,0.07);
+    }
+
+    .side-btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    /* NEW: chart */
+
+    .chart-panel {
+      margin-top: 16px;
+    }
+
+    .chart-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 15px;
+      margin-bottom: 12px;
+    }
+
+    .chart-title {
+      font-size: 15px;
+      font-weight: 800;
+    }
+
+    .chart-subtitle {
+      margin-top: 4px;
+      color: #718077;
+      font-size: 11px;
+      line-height: 1.5;
+    }
+
+    .chart-badge {
+      flex-shrink: 0;
+      padding: 5px 8px;
+      border-radius: 999px;
+      color: #d5b76c;
+      background: rgba(213,183,108,0.07);
+      border: 1px solid rgba(213,183,108,0.12);
+      font-size: 10px;
+      font-weight: 800;
+    }
+
+    .chart-container {
+      position: relative;
+      width: 100%;
+      height: 280px;
+      border-radius: 12px;
+      overflow: hidden;
+      background:
+        linear-gradient(
+          180deg,
+          rgba(255,255,255,0.018),
+          rgba(255,255,255,0.006)
+        );
+      border: 1px solid rgba(255,255,255,0.045);
+    }
+
+    #marketPriceChart {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    .chart-loading {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #829187;
+      font-size: 11px;
+      background: rgba(7,17,13,0.55);
+    }
+
+    .chart-loading.hidden {
+      display: none;
+    }
+
+    .chart-legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 15px;
+      margin-top: 10px;
+      color: #829187;
+      font-size: 10px;
+    }
+
+    .legend-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .legend-line {
+      width: 18px;
+      height: 2px;
+      background: #d5b76c;
+    }
+
+    .legend-price {
+      width: 18px;
+      height: 2px;
+      background: #79dfa1;
+    }
+
+    .legend-deadline {
+      width: 2px;
+      height: 12px;
+      background: #ef9c9c;
+    }
+
+    .wallet-address {
+      max-width: 180px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-size: 11px;
+      color: #8b9a90;
+    }
+
+    .toast {
+      position: fixed;
+      right: 18px;
+      bottom: 18px;
+      z-index: 200;
+      max-width: 400px;
+      display: none;
+      padding: 14px 16px;
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 12px;
+      background: #102019;
+      color: #eaf4ed;
+      box-shadow: 0 20px 50px rgba(0,0,0,0.35);
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    .toast.show {
+      display: block;
+    }
+
+    .toast.error {
+      border-color: rgba(220,80,80,0.25);
+    }
+
+    .toast.success {
+      border-color: rgba(76,191,120,0.25);
+    }
+
+    .code-box {
+      padding: 12px;
+      border-radius: 10px;
+      background: #07100b;
+      border: 1px solid rgba(255,255,255,0.05);
+      color: #92a096;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 10px;
+      line-height: 1.6;
+      word-break: break-all;
+    }
+
+    .resolve-countdown {
+      margin-top: 10px;
+      padding: 10px 12px;
+      border-radius: 10px;
+      background: rgba(213,183,108,0.045);
+      border: 1px solid rgba(213,183,108,0.08);
+      text-align: center;
+      color: #9eaa9f;
+      font-size: 11px;
+    }
+
+    .resolve-countdown.ready {
+      color: #7ee0a4;
+      border-color: rgba(76,191,120,0.18);
+      background: rgba(47,142,91,0.08);
+    }
+
+    .bet-locked {
+      margin-top: 10px;
+      padding: 10px 12px;
+      border-radius: 10px;
+      color: #ef9c9c;
+      border: 1px solid rgba(220,80,80,0.16);
+      background: rgba(164,61,61,0.07);
+      text-align: center;
+      font-size: 11px;
+      font-weight: 700;
+    }
+
+    .bet-open {
+      margin-top: 10px;
+      padding: 10px 12px;
+      border-radius: 10px;
+      color: #d5b76c;
+      border: 1px solid rgba(213,183,108,0.08);
+      background: rgba(213,183,108,0.045);
+      text-align: center;
+      font-size: 11px;
+    }
+
+    @media (max-width: 900px) {
+      .hero-grid,
+      .detail-layout {
+        grid-template-columns: 1fr;
+      }
+
+      .markets {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
+
+    @media (max-width: 650px) {
+      .container {
+        width: min(100% - 22px, 1180px);
+      }
+
+      .header-inner {
+        min-height: 66px;
+      }
+
+      .brand-subtitle {
+        display: none;
+      }
+
+      .wallet-address {
+        display: none;
+      }
+
+      .hero {
+        padding-top: 30px;
+      }
+
+      .hero-card {
+        padding: 23px;
+      }
+
+      .markets {
+        grid-template-columns: 1fr;
+      }
+
+      .form-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .form-group.full {
+        grid-column: auto;
+      }
+
+      .chart-container {
+        height: 230px;
+      }
+
+      .chart-header {
+        flex-direction: column;
+      }
+    }
+  </style>
 </head>
 
 <body>
 
-<div class="shell">
+<header>
+  <div class="container header-inner">
 
-  <header class="top">
     <div class="brand">
-      <h1>Prediction Ledger</h1>
-      <p>YES/NO markets on BTC · ETH · SOL price thresholds — PredictionMarket contract</p>
-    </div>
+      <div class="brand-mark">PL</div>
 
-    <div class="top-actions">
-      <span id="netPill" class="pill">
-        <span class="dot"></span>
-        <span id="netLabel">Network not set</span>
-      </span>
-
-      <button id="settingsBtn" class="ghost small" title="Network configuration is fixed" style="display:none">
-        Settings
-      </button>
-
-      <button id="connectBtn" class="primary">
-        Connect Wallet
-      </button>
-    </div>
-  </header>
-
-  <div class="board">
-
-    <div class="panel">
-      <h2>Markets</h2>
-
-      <div style="display:flex; gap:8px; margin-bottom:12px;">
-        <button id="refreshBtn" class="ghost small" style="flex:1">
-          Refresh
-        </button>
-
-        <button id="newMarketBtn" class="small" style="flex:1">
-          New Market +
-        </button>
-      </div>
-
-      <div id="marketList">
-        <div class="empty">
-          Loading Prediction Ledger markets…
+      <div class="brand-text">
+        <div class="brand-title">Prediction Ledger</div>
+        <div class="brand-subtitle">
+          Deadline-bound decentralized prediction markets
         </div>
       </div>
     </div>
 
-    <div class="panel" id="mainPanel">
-      <div class="empty">
-        Select a market from the list, or create a new one.
-      </div>
-    </div>
+    <div class="header-actions">
 
-  </div>
+      <div id="walletAddress" class="wallet-address"></div>
 
-  <details class="debug">
-    <summary>Raw console (debug)</summary>
-    <pre id="debugLog">—</pre>
-  </details>
-
-  <footer>
-    Runs locally against GenLayer Studio · no data leaves your browser except calls to the configured RPC
-  </footer>
-
-</div>
-
-
-<!-- SETTINGS MODAL -->
-
-<div class="overlay" id="settingsOverlay">
-  <div class="modal">
-
-    <h3>Network Settings</h3>
-
-    <div class="field">
-      <label for="cfgAddress">PredictionMarket contract address</label>
-      <input id="cfgAddress" class="num" placeholder="0x...">
-    </div>
-
-    <div class="field">
-      <label for="cfgRpc">Local Studio RPC URL</label>
-      <input id="cfgRpc" class="num" placeholder="http://localhost:4000/api">
-    </div>
-
-    <div class="field">
-      <label for="cfgChainId">Chain ID</label>
-      <input id="cfgChainId" class="num" placeholder="61999">
-    </div>
-
-    <p class="hint">
-      Production network configuration is fixed for Prediction Ledger.
-    </p>
-
-    <div class="modal-actions">
-      <button id="cfgSave" class="primary">Save</button>
-      <button id="cfgClose" class="ghost">Close</button>
-    </div>
-
-  </div>
-</div>
-
-
-<!-- NEW MARKET MODAL -->
-
-<div class="overlay" id="newMarketOverlay">
-  <div class="modal">
-
-    <h3>Create a New Market</h3>
-
-    <div class="field">
-      <label for="nmQuestion">Market question</label>
-      <input
-        id="nmQuestion"
-        placeholder="e.g. Will BTC be above $70,000 by the deadline?"
+      <button
+        id="connectBtn"
+        class="btn btn-primary"
+        onclick="connectWallet()"
       >
+        Connect Wallet
+      </button>
+
+      <button
+        class="btn"
+        onclick="openCreateModal()"
+      >
+        + Create Market
+      </button>
+
     </div>
+  </div>
+</header>
 
-    <div class="row2">
+<div class="container">
 
-      <div class="field">
-        <label for="nmAsset">Asset</label>
+  <section class="hero">
 
-        <select id="nmAsset">
-          <option value="BTC">BTC</option>
-          <option value="ETH">ETH</option>
-          <option value="SOL">SOL</option>
-        </select>
+    <div class="hero-grid">
+
+      <div class="hero-card">
+
+        <span class="eyebrow">
+          GenLayer • Studionet
+        </span>
+
+        <h1>
+          Prediction markets with
+          deadline-bound settlement.
+        </h1>
+
+        <div class="hero-copy">
+          Markets use a fixed asset-above-threshold rule.
+          Settlement evidence is tied to the stored market deadline,
+          independently checked by validators, and persisted on-chain
+          after consensus.
+        </div>
+
+        <div class="hero-buttons">
+
+          <button
+            class="btn btn-primary"
+            onclick="openCreateModal()"
+          >
+            Create Market
+          </button>
+
+          <button
+            class="btn"
+            onclick="loadMarkets()"
+          >
+            Refresh Markets
+          </button>
+
+        </div>
+
       </div>
 
-      <div class="field">
-        <label for="nmThreshold">Threshold price (USD)</label>
+      <div class="stats-card">
 
-        <input
-          id="nmThreshold"
-          class="num"
-          type="number"
-          step="any"
-          placeholder="65000"
-        />
+        <div>
+          <div class="stat-label">
+            Markets
+          </div>
+
+          <div
+            id="marketCount"
+            class="stat-value"
+          >
+            —
+          </div>
+        </div>
+
+        <div>
+
+          <div class="stat-label">
+            Contract
+          </div>
+
+          <div
+            class="code-box"
+            style="margin-top:10px"
+          >
+            0x62e807718721eA25be548221c287D523256Eed54
+          </div>
+
+          <div class="network">
+            <span class="network-dot"></span>
+            GenLayer Studionet
+          </div>
+
+        </div>
+
       </div>
 
     </div>
 
-    <div class="field">
-      <label for="nmDeadline">Betting deadline</label>
-      <input id="nmDeadline" type="datetime-local">
+  </section>
+
+  <main>
+
+    <div class="section-head">
+
+      <div>
+        <div class="section-title">
+          Markets
+        </div>
+
+        <div class="section-subtitle">
+          Select a market to view odds, positions and settlement evidence.
+        </div>
+      </div>
+
     </div>
 
-    <div class="field">
-      <label for="nmSource">Resolution source (CoinGecko only)</label>
-
-      <input id="nmSource" class="num" readonly>
-
-      <p class="hint">
-        Built automatically from the chosen asset — the contract only accepts the CoinGecko prefix.
-      </p>
+    <div
+      id="markets"
+      class="markets"
+    >
+      <div class="loading">
+        <span class="spinner"></span>
+        Loading markets...
+      </div>
     </div>
 
-    <div class="modal-actions">
-      <button id="nmSubmit" class="primary">
+  </main>
+
+</div>
+
+<!-- Create Market Modal -->
+
+<div
+  id="createModal"
+  class="modal-backdrop"
+>
+
+  <div class="modal">
+
+    <div class="modal-head">
+
+      <div class="modal-title">
+        Create Market
+      </div>
+
+      <button
+        class="close"
+        onclick="closeCreateModal()"
+      >
+        ×
+      </button>
+
+    </div>
+
+    <div class="modal-body">
+
+      <div class="form-grid">
+
+        <div class="form-group">
+
+          <label>
+            Asset
+          </label>
+
+          <select
+            id="nmAsset"
+            onchange="updateQuestionPreview()"
+          >
+
+            <option value="BTC">
+              BTC — Bitcoin
+            </option>
+
+            <option value="ETH">
+              ETH — Ethereum
+            </option>
+
+            <option value="SOL">
+              SOL — Solana
+            </option>
+
+          </select>
+
+        </div>
+
+        <div class="form-group">
+
+          <label>
+            Threshold (USD)
+          </label>
+
+          <input
+            id="nmThreshold"
+            type="number"
+            min="0"
+            step="0.01"
+            value="120000"
+            oninput="updateQuestionPreview()"
+          />
+
+        </div>
+
+        <div class="form-group full">
+
+          <label>
+            Market Question
+          </label>
+
+          <input
+            id="nmQuestion"
+            type="text"
+            readonly
+          />
+
+          <div class="hint">
+            The question is generated by the contract from the selected
+            asset and threshold. It cannot be manually changed.
+          </div>
+
+        </div>
+
+        <div class="form-group full">
+
+          <label>
+            Deadline
+          </label>
+
+          <input
+            id="nmDeadline"
+            type="datetime-local"
+          />
+
+          <div class="hint">
+            The contract stores this deadline and later uses it to construct
+            the historical settlement evidence source.
+          </div>
+
+        </div>
+
+        <div class="form-group full">
+
+          <label>
+            Settlement Evidence Source
+          </label>
+
+          <input
+            id="nmSource"
+            type="text"
+            readonly
+            value="Generated by contract from the stored deadline"
+          />
+
+          <div class="hint">
+            Historical CoinGecko market-chart evidence is generated by the
+            contract during settlement. No user-supplied source is accepted.
+          </div>
+
+        </div>
+
+      </div>
+
+    </div>
+
+    <div class="modal-footer">
+
+      <button
+        class="btn"
+        onclick="closeCreateModal()"
+      >
+        Cancel
+      </button>
+
+      <button
+        id="createBtn"
+        class="btn btn-primary"
+        onclick="createMarket()"
+      >
         Create Market
       </button>
 
-      <button id="nmClose" class="ghost">
-        Cancel
-      </button>
     </div>
 
   </div>
+
 </div>
 
+<!-- Market Detail Modal -->
 
-<div class="toasts" id="toasts"></div>
+<div
+  id="detailModal"
+  class="modal-backdrop"
+>
 
+  <div class="modal">
+
+    <div class="modal-head">
+
+      <div>
+        <div
+          id="detailTitle"
+          class="modal-title"
+        >
+          Market
+        </div>
+      </div>
+
+      <button
+        class="close"
+        onclick="closeDetailModal()"
+      >
+        ×
+      </button>
+
+    </div>
+
+    <div class="modal-body">
+
+      <div id="detailContent"></div>
+
+    </div>
+
+  </div>
+
+</div>
+
+<div id="toast" class="toast"></div>
 
 <script type="module">
-
-// =====================================================================
-// GenLayer
-// =====================================================================
 
 import { createClient } from "https://cdn.jsdelivr.net/npm/genlayer-js/+esm";
 import * as chains from "https://cdn.jsdelivr.net/npm/genlayer-js/chains/+esm";
 
 
-// =====================================================================
-// CONFIG
-// =====================================================================
+/* =========================================================
+   FIXED CONTRACT CONFIG
+========================================================= */
 
-const GEN_DECIMALS = 18n;
-
-// Production configuration — fixed for Prediction Ledger.
 const FIXED_CONFIG = Object.freeze({
-  address: "0x97eCfbE5b74ABd4848B083b4EBf1443626c4c107",
-  rpc: "https://studio.genlayer.com/api",
-  chainId: "61999"
+
+  address:
+    "0x1C011f310166CB73aD36A9E02b33519D72c9f160",
+
+  rpc:
+    "https://studio.genlayer.com/api",
+
+  chainId:
+    "61999"
+
 });
 
 
-// =====================================================================
-// STATE
-// =====================================================================
+/* =========================================================
+   Coin configuration
+========================================================= */
 
-const state = {
-  cfg: loadConfig(),
-  address: null,
-  readClient: null,
-  writeClient: null,
-  markets: [],
-  activeId: null,
-  activeTab: "bet",
+const COINS = {
+
+  BTC: {
+    symbol: "BTC",
+    name: "Bitcoin",
+    coinId: "bitcoin",
+    logo:
+      "https://assets.coingecko.com/coins/images/1/large/bitcoin.png"
+  },
+
+  ETH: {
+    symbol: "ETH",
+    name: "Ethereum",
+    coinId: "ethereum",
+    logo:
+      "https://assets.coingecko.com/coins/images/279/large/ethereum.png"
+  },
+
+  SOL: {
+    symbol: "SOL",
+    name: "Solana",
+    coinId: "solana",
+    logo:
+      "https://assets.coingecko.com/coins/images/4128/large/solana.png"
+  }
+
 };
 
 
-// =====================================================================
-// CONFIG HELPERS
-// =====================================================================
+/* =========================================================
+   State
+========================================================= */
 
-function loadConfig() {
-  return { ...FIXED_CONFIG };
-}
+let client = null;
+let account = null;
 
-function saveConfig() {
-  state.cfg = { ...FIXED_CONFIG };
-}
+let markets = [];
+let selectedMarket = null;
+let selectedBetSide = "YES";
 
+let marketCount = 0;
 
-// =====================================================================
-// DEBUG LOG
-// =====================================================================
+let resolveCountdownTimer = null;
+let marketCountdownTimer = null;
 
-function log(label, data) {
-
-  const el = document.getElementById("debugLog");
-
-  const line =
-    `[${new Date().toLocaleTimeString()}] ${label}\n${
-      typeof data === "string"
-        ? data
-        : JSON.stringify(
-            data,
-            (_, v) => typeof v === "bigint" ? v.toString() : v,
-            2
-          )
-    }`;
-
-  el.textContent =
-    (line + "\n\n" + el.textContent).slice(0, 8000);
-}
+/* NEW: prevents an old chart request from drawing into
+   a newly opened market */
+let chartRequestId = 0;
 
 
-// =====================================================================
-// TOAST
-// =====================================================================
+/* =========================================================
+   Utility
+========================================================= */
 
-function toast(title, body, kind = "") {
+function escapeHtml(value) {
 
-  const box = document.getElementById("toasts");
+  if (value === null || value === undefined) {
+    return "";
+  }
 
-  const el = document.createElement("div");
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
 
-  el.className = "toast " + kind;
-
-  el.innerHTML =
-    `<div class="t-title">${escapeHtml(title)}</div>` +
-    `<div class="t-body">${escapeHtml(body || "")}</div>`;
-
-  box.appendChild(el);
-
-  setTimeout(() => el.remove(), 9000);
 }
 
 
-function escapeHtml(s) {
+/* NEW: normalize blockchain timestamp to seconds */
 
-  return String(s).replace(
-    /[&<>"']/g,
-    c => ({
-      "&":"&amp;",
-      "<":"&lt;",
-      ">":"&gt;",
-      '"':"&quot;",
-      "'":"&#39;"
-    }[c])
+function getEpochSeconds(value) {
+
+  const n = Number(value);
+
+  if (!Number.isFinite(n)) {
+    return NaN;
+  }
+
+  if (n > 100000000000) {
+    return Math.floor(n / 1000);
+  }
+
+  return Math.floor(n);
+
+}
+
+
+/* NEW: human-readable countdown */
+
+function formatCountdown(remaining) {
+
+  if (!Number.isFinite(remaining)) {
+    return "Unknown";
+  }
+
+  if (remaining <= 0) {
+    return "Deadline reached";
+  }
+
+  const days =
+    Math.floor(
+      remaining / 86400
+    );
+
+  const hours =
+    Math.floor(
+      (remaining % 86400) / 3600
+    );
+
+  const minutes =
+    Math.floor(
+      (remaining % 3600) / 60
+    );
+
+  const seconds =
+    remaining % 60;
+
+  if (days > 0) {
+
+    return `${days}d ${hours}h ${minutes}m ${seconds}s`;
+
+  }
+
+  return `${hours}h ${minutes}m ${seconds}s`;
+
+}
+
+
+function shortAddress(address) {
+
+  if (!address) {
+    return "";
+  }
+
+  return (
+    address.slice(0, 6) +
+    "..." +
+    address.slice(-4)
   );
 
 }
 
 
-// =====================================================================
-// CHAIN
-// =====================================================================
+function formatNumber(value) {
 
-function resolveChain() {
-
-  const base = chains.localnet || chains.studionet;
-
-  return {
-    ...base,
-
-    id: state.cfg.chainId
-      ? Number(state.cfg.chainId)
-      : base.id,
-
-    rpcUrls: state.cfg.rpc
-      ? {
-          default: {
-            http: [state.cfg.rpc]
-          },
-
-          public: {
-            http: [state.cfg.rpc]
-          }
-        }
-      : base.rpcUrls,
-  };
-}
-
-
-// =====================================================================
-// CONFIG CHECK
-// =====================================================================
-
-function ensureConfigured() {
-
-  if (!state.cfg.address) {
-
-    toast(
-      "Contract not configured",
-      "Set the contract address in Settings first.",
-      "err"
-    );
-
-    return false;
+  if (
+    value === null ||
+    value === undefined ||
+    value === ""
+  ) {
+    return "—";
   }
 
-  return true;
+  const n = Number(value);
+
+  if (!Number.isFinite(n)) {
+    return String(value);
+  }
+
+  return n.toLocaleString(
+    undefined,
+    {
+      maximumFractionDigits: 4
+    }
+  );
+
 }
 
 
-// =====================================================================
-// WALLET CONNECTION
-// =====================================================================
+function formatUsd(value) {
 
-async function connectWallet() {
+  if (
+    value === null ||
+    value === undefined ||
+    value === ""
+  ) {
+    return "—";
+  }
+
+  const n = Number(value);
+
+  if (!Number.isFinite(n)) {
+    return String(value);
+  }
+
+  return "$" + n.toLocaleString(
+    undefined,
+    {
+      maximumFractionDigits: 2
+    }
+  );
+
+}
+
+
+function formatDate(value) {
+
+  if (
+    value === null ||
+    value === undefined ||
+    value === ""
+  ) {
+    return "—";
+  }
+
+  let date;
+
+  if (
+    typeof value === "number" ||
+    /^\d+$/.test(String(value))
+  ) {
+
+    let timestamp = Number(value);
+
+    if (timestamp < 100000000000) {
+      timestamp *= 1000;
+    }
+
+    date = new Date(timestamp);
+
+  } else {
+
+    date = new Date(value);
+
+  }
+
+  if (Number.isNaN(date.getTime())) {
+    return String(value);
+  }
+
+  return date.toLocaleString();
+
+}
+
+
+function formatDeadlineInput(date) {
+
+  const pad = n =>
+    String(n).padStart(2, "0");
+
+  return (
+    date.getFullYear() +
+    "-" +
+    pad(date.getMonth() + 1) +
+    "-" +
+    pad(date.getDate()) +
+    "T" +
+    pad(date.getHours()) +
+    ":" +
+    pad(date.getMinutes())
+  );
+
+}
+
+
+/* =========================================================
+   Toast
+========================================================= */
+
+function showToast(
+  message,
+  type = ""
+) {
+
+  const toast =
+    document.getElementById("toast");
+
+  toast.textContent = message;
+
+  toast.className =
+    "toast show " +
+    type;
+
+  clearTimeout(
+    showToast.timer
+  );
+
+  showToast.timer =
+    setTimeout(
+      () => {
+        toast.className = "toast";
+      },
+      5000
+    );
+
+}
+
+
+/* =========================================================
+   Client
+========================================================= */
+
+async function getClient() {
 
   if (!window.ethereum) {
 
-    toast(
-      "Wallet not found",
-      "MetaMask isn't installed or enabled.",
-      "err"
+    throw new Error(
+      "No wallet detected. Please install MetaMask or another compatible wallet."
     );
 
-    return;
   }
+
+  if (!client) {
+
+    client = createClient({
+
+      chain:
+        chains.studionet,
+
+      account:
+        account,
+
+      provider:
+        window.ethereum
+
+    });
+
+  }
+
+  return client;
+
+}
+
+
+/* =========================================================
+   Connect Wallet
+========================================================= */
+
+window.connectWallet = async function() {
 
   try {
 
-    const [addr] =
+    if (!window.ethereum) {
+
+      throw new Error(
+        "No Ethereum-compatible wallet was found."
+      );
+
+    }
+
+    const accounts =
       await window.ethereum.request({
         method: "eth_requestAccounts"
       });
 
-    state.address = addr;
+    if (!accounts || !accounts.length) {
 
-    const chain = resolveChain();
+      throw new Error(
+        "No wallet account returned."
+      );
 
-
-    // Read-only client
-    state.readClient = createClient({
-      chain
-    });
-
-
-    // Wallet client
-    state.writeClient = createClient({
-      chain,
-      account: addr,
-      provider: window.ethereum
-    });
-
-
-    // GenLayer wallet connection
-    await state.writeClient.connect("studionet");
-
-
-    document.getElementById("connectBtn").textContent =
-      shortAddr(addr);
-
-    document.getElementById("netPill").classList.add("live");
-
-    document.getElementById("netLabel").textContent =
-      `${chain.name || "GenLayer"} · #${chain.id}`;
-
-
-    log("wallet connected", {
-      addr,
-      chain
-    });
-
-
-    toast(
-      "Wallet connected",
-      shortAddr(addr),
-      "ok"
-    );
-
-
-    if (state.cfg.address) {
-      refreshMarkets();
     }
 
-  } catch (e) {
+    account = accounts[0];
 
-    log("connect error", String(e));
+    client = createClient({
 
-    toast(
-      "Connection failed",
-      String(e.message || e),
-      "err"
-    );
-  }
-}
+      chain:
+        chains.studionet,
 
+      account,
 
-// =====================================================================
-// ADDRESS
-// =====================================================================
+      provider:
+        window.ethereum
 
-function shortAddr(a) {
-
-  return a
-    ? a.slice(0, 6) + "…" + a.slice(-4)
-    : "";
-}
-
-
-// =====================================================================
-// READ CLIENT
-// =====================================================================
-
-function getReadClient() {
-
-  if (state.readClient) {
-    return state.readClient;
-  }
-
-  const chain = resolveChain();
-
-  state.readClient =
-    createClient({ chain });
-
-  return state.readClient;
-}
-
-
-// =====================================================================
-// CONTRACT READ
-// =====================================================================
-
-async function callView(fn, args = []) {
-
-  const client = getReadClient();
-
-  const res =
-    await client.readContract({
-      address: state.cfg.address,
-      functionName: fn,
-      args,
     });
 
-  log(
-    `view ${fn}(${args.join(", ")})`,
-    res
+    document.getElementById(
+      "walletAddress"
+    ).textContent =
+      shortAddress(account);
+
+    document.getElementById(
+      "connectBtn"
+    ).textContent =
+      shortAddress(account);
+
+    showToast(
+      "Wallet connected.",
+      "success"
+    );
+
+  } catch (error) {
+
+    console.error(error);
+
+    showToast(
+      error?.message ||
+      "Wallet connection failed.",
+      "error"
+    );
+
+  }
+
+};
+
+
+/* =========================================================
+   Wallet account change
+========================================================= */
+
+if (window.ethereum) {
+
+  window.ethereum.on(
+    "accountsChanged",
+    async accounts => {
+
+      if (!accounts || !accounts.length) {
+
+        account = null;
+        client = null;
+
+        document.getElementById(
+          "walletAddress"
+        ).textContent = "";
+
+        document.getElementById(
+          "connectBtn"
+        ).textContent =
+          "Connect Wallet";
+
+        return;
+
+      }
+
+      account = accounts[0];
+
+      client = createClient({
+
+        chain:
+          chains.studionet,
+
+        account,
+
+        provider:
+          window.ethereum
+
+      });
+
+      document.getElementById(
+        "walletAddress"
+      ).textContent =
+        shortAddress(account);
+
+      document.getElementById(
+        "connectBtn"
+      ).textContent =
+        shortAddress(account);
+
+    }
   );
 
-  return res;
 }
 
 
-// =====================================================================
-// CONTRACT WRITE
-// =====================================================================
+/* =========================================================
+   Read contract
+========================================================= */
 
-async function callWrite(
-  fn,
-  args = [],
-  valueWei = 0n
+async function callRead(
+  method,
+  args = []
 ) {
 
-  if (!state.writeClient) {
+  const c = await getClient();
 
-    await connectWallet();
+  return await c.readContract({
 
-    if (!state.writeClient) {
-      throw new Error("wallet not connected");
-    }
-  }
+    address:
+      FIXED_CONFIG.address,
 
+    functionName:
+      method,
 
-  // IMPORTANT:
-  // Do NOT pass account here.
-  // The account is already attached to createClient().
-  const payload = {
-    address: state.cfg.address,
-    functionName: fn,
     args
-  };
+
+  });
+
+}
 
 
-  if (valueWei > 0n) {
-    payload.value = valueWei;
+/* =========================================================
+   Write contract
+========================================================= */
+
+async function callWrite(
+  method,
+  args = [],
+  value = undefined
+) {
+
+  if (!account) {
+
+    await window.connectWallet();
+
   }
 
+  if (!account) {
 
-  log(
-    `write ${fn}(${args.join(", ")})`,
-    payload
-  );
-
-
-  const hash =
-    await state.writeClient.writeContract(
-      payload
+    throw new Error(
+      "Connect your wallet first."
     );
 
+  }
 
-  toast(
-    "Transaction sent",
-    fn + " · waiting for confirmation…"
-  );
+  const c =
+    await getClient();
 
+  const params = {
 
-  const receipt =
-    await state.writeClient.waitForTransactionReceipt({
-      hash
-    });
+    address:
+      FIXED_CONFIG.address,
 
+    functionName:
+      method,
 
-  log(
-    `receipt ${fn}`,
-    receipt
-  );
+    args
 
+  };
 
-  return receipt;
+  if (
+    value !== undefined &&
+    value !== null &&
+    value !== ""
+  ) {
+
+    params.value = value;
+
+  }
+
+  const tx =
+    await c.writeContract(params);
+
+  return tx;
+
 }
 
 
-// =====================================================================
-// VALUE HELPERS
-// =====================================================================
+/* =========================================================
+   Create Market
+========================================================= */
 
-function toWei(genAmountStr) {
+window.openCreateModal = function() {
 
-  const [
-    whole,
-    frac = ""
-  ] =
-    String(genAmountStr)
-      .trim()
-      .split(".");
+  updateQuestionPreview();
 
-  const fracPadded =
-    (frac + "0".repeat(18))
-      .slice(0, 18);
+  const deadline =
+    document.getElementById(
+      "nmDeadline"
+    );
 
-  return (
-    BigInt(whole || "0") *
-      (10n ** GEN_DECIMALS)
-    +
-    BigInt(fracPadded || "0")
-  );
-}
+  if (!deadline.value) {
 
+    const date =
+      new Date(
+        Date.now() +
+        24 * 60 * 60 * 1000
+      );
 
-function fromWei(weiStr) {
+    deadline.value =
+      formatDeadlineInput(date);
 
-  const w =
-    BigInt(weiStr || "0");
+  }
 
-  const base =
-    10n ** GEN_DECIMALS;
-
-  const whole =
-    w / base;
-
-  const frac =
-    (w % base)
-      .toString()
-      .padStart(18, "0")
-      .replace(/0+$/, "") || "0";
-
-  return `${whole}.${frac}`;
-}
-
-
-// =====================================================================
-// COINGECKO SOURCES
-// =====================================================================
-
-const COIN_SOURCE = {
-
-  BTC:
-    "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd",
-
-  ETH:
-    "https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd",
-
-  SOL:
-    "https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd",
+  document
+    .getElementById("createModal")
+    .classList.add("show");
 
 };
 
 
-// =====================================================================
-// BINANCE CHART CONFIG
-// =====================================================================
+window.closeCreateModal = function() {
 
-const BINANCE_SYMBOL = {
-  BTC: "BTCUSDT",
-  ETH: "ETHUSDT",
-  SOL: "SOLUSDT"
+  document
+    .getElementById("createModal")
+    .classList.remove("show");
+
 };
 
 
-// =====================================================================
-// PRICE CHART
-// =====================================================================
+window.updateQuestionPreview = function() {
 
-async function loadPriceChart(asset, threshold) {
+  const asset =
+    document.getElementById(
+      "nmAsset"
+    ).value;
 
-  const chartEl =
-    document.getElementById("priceChart");
+  const threshold =
+    document.getElementById(
+      "nmThreshold"
+    ).value;
 
-  if (!chartEl) {
+  const coin =
+    COINS[asset];
+
+  if (!coin) {
     return;
   }
 
+  const formattedThreshold =
+    Number(threshold || 0)
+      .toLocaleString();
+
+  document.getElementById(
+    "nmQuestion"
+  ).value =
+    `Will ${coin.name} (${asset}) be above $${formattedThreshold} at the market deadline?`;
 
-  chartEl.innerHTML =
-    `<div class="chart-loading">
-      Loading ${escapeHtml(asset)} price chart…
-    </div>`;
-
-
-  try {
-
-    const symbol =
-      BINANCE_SYMBOL[asset];
-
-    if (!symbol) {
-      throw new Error("Unsupported asset");
-    }
-
-
-    const url =
-      `https://api.binance.com/api/v3/klines` +
-      `?symbol=${symbol}` +
-      `&interval=1h` +
-      `&limit=24`;
-
-
-    const response =
-      await fetch(url);
-
-
-    if (!response.ok) {
-      throw new Error(
-        `Chart API returned ${response.status}`
-      );
-    }
-
-
-    const rows =
-      await response.json();
-
-
-    const points =
-      rows.map(row => ({
-        time: Number(row[0]),
-        price: Number(row[4])
-      }))
-      .filter(
-        p => Number.isFinite(p.price)
-      );
-
-
-    if (points.length < 2) {
-      throw new Error(
-        "Not enough price data"
-      );
-    }
-
-
-    renderPriceChart(
-      chartEl,
-      asset,
-      points,
-      Number(threshold)
-    );
-
-  } catch (e) {
-
-    log(
-      "price chart error",
-      String(e)
-    );
-
-
-    chartEl.innerHTML =
-      `<div class="chart-error">
-        Price chart unavailable right now.
-      </div>`;
-  }
-}
-
-
-function renderPriceChart(
-  container,
-  asset,
-  points,
-  threshold
-) {
-
-  const width = 760;
-  const height = 230;
-
-  const padLeft = 65;
-  const padRight = 14;
-  const padTop = 18;
-  const padBottom = 28;
-
-  const chartWidth =
-    width - padLeft - padRight;
-
-  const chartHeight =
-    height - padTop - padBottom;
-
-
-  const prices =
-    points.map(p => p.price);
-
-
-  let minPrice =
-    Math.min(...prices, threshold);
-
-  let maxPrice =
-    Math.max(...prices, threshold);
-
-
-  if (!Number.isFinite(minPrice) ||
-      !Number.isFinite(maxPrice)) {
-
-    throw new Error(
-      "Invalid chart values"
-    );
-  }
-
-
-  let range =
-    maxPrice - minPrice;
-
-
-  if (range === 0) {
-    range =
-      Math.max(
-        Math.abs(maxPrice) * 0.01,
-        1
-      );
-  }
-
-
-  const padding =
-    range * 0.12;
-
-
-  minPrice -= padding;
-  maxPrice += padding;
-
-
-  const scaleX =
-    i =>
-      padLeft +
-      (i / (points.length - 1)) *
-      chartWidth;
-
-
-  const scaleY =
-    price =>
-      padTop +
-      (1 -
-        (price - minPrice) /
-        (maxPrice - minPrice)
-      ) *
-      chartHeight;
-
-
-  const linePoints =
-    points
-      .map(
-        (p, i) =>
-          `${scaleX(i).toFixed(2)},${scaleY(p.price).toFixed(2)}`
-      )
-      .join(" ");
-
-
-  const areaPoints =
-    `${padLeft},${padTop + chartHeight} ` +
-    linePoints +
-    ` ${scaleX(points.length - 1)},${padTop + chartHeight}`;
-
-
-  const thresholdY =
-    scaleY(threshold);
-
-
-  const latest =
-    points[points.length - 1].price;
-
-
-  const previous =
-    points.length > 1
-      ? points[points.length - 2].price
-      : latest;
-
-
-  const change =
-    previous
-      ? ((latest - previous) / previous) * 100
-      : 0;
-
-
-  const changeText =
-    `${change >= 0 ? "+" : ""}${change.toFixed(2)}%`;
-
-
-  const formatPrice =
-    value =>
-      "$" +
-      Number(value).toLocaleString(
-        "en-US",
-        {
-          maximumFractionDigits:
-            value >= 100
-              ? 2
-              : 4
-        }
-      );
-
-
-  const yTicks =
-    [0, .25, .5, .75, 1];
-
-
-  const grid =
-    yTicks
-      .map(t => {
-
-        const price =
-          maxPrice -
-          t * (maxPrice - minPrice);
-
-        const y =
-          padTop +
-          t * chartHeight;
-
-        return `
-          <line
-            x1="${padLeft}"
-            y1="${y}"
-            x2="${width - padRight}"
-            y2="${y}"
-            class="chart-grid-line"
-          />
-
-          <text
-            x="${padLeft - 8}"
-            y="${y + 4}"
-            text-anchor="end"
-            class="chart-label"
-          >
-            ${escapeHtml(formatPrice(price))}
-          </text>
-        `;
-      })
-      .join("");
-
-
-  const firstTime =
-    new Date(
-      points[0].time
-    ).toLocaleTimeString(
-      [],
-      {
-        hour:"2-digit",
-        minute:"2-digit"
-      }
-    );
-
-
-  const lastTime =
-    new Date(
-      points[points.length - 1].time
-    ).toLocaleTimeString(
-      [],
-      {
-        hour:"2-digit",
-        minute:"2-digit"
-      }
-    );
-
-
-  const thresholdLabelY =
-    Math.max(
-      padTop + 13,
-      Math.min(
-        height - padBottom - 5,
-        thresholdY - 7
-      )
-    );
-
-
-  container.innerHTML = `
-
-    <div class="price-chart-head">
-
-      <div>
-        <div class="price-chart-title">
-          ${escapeHtml(asset)} price · last 24h
-        </div>
-
-        <div class="price-chart-sub">
-          Binance market data
-        </div>
-      </div>
-
-      <div style="text-align:right;">
-
-        <div class="price-chart-current">
-          ${escapeHtml(formatPrice(latest))}
-        </div>
-
-        <div
-          class="price-chart-sub"
-          style="
-            color:${
-              change >= 0
-                ? "var(--gold)"
-                : "var(--rust)"
-            };
-          "
-        >
-          ${changeText} vs previous hour
-        </div>
-
-      </div>
-
-    </div>
-
-
-    <div class="price-chart">
-
-      <svg
-        viewBox="0 0 ${width} ${height}"
-        preserveAspectRatio="none"
-        aria-label="${escapeHtml(asset)} price chart"
-      >
-
-        ${grid}
-
-
-        <polygon
-          points="${areaPoints}"
-          class="chart-price-area"
-        />
-
-
-        <line
-          x1="${padLeft}"
-          y1="${thresholdY}"
-          x2="${width - padRight}"
-          y2="${thresholdY}"
-          class="chart-threshold-line"
-        />
-
-
-        <text
-          x="${width - padRight - 2}"
-          y="${thresholdLabelY}"
-          text-anchor="end"
-          class="chart-threshold-label"
-        >
-          Threshold ${escapeHtml(formatPrice(threshold))}
-        </text>
-
-
-        <polyline
-          points="${linePoints}"
-          class="chart-price-line"
-        />
-
-
-        <circle
-          cx="${scaleX(points.length - 1)}"
-          cy="${scaleY(latest)}"
-          r="4"
-          fill="var(--gold)"
-        />
-
-
-        <text
-          x="${padLeft}"
-          y="${height - 7}"
-          class="chart-label"
-        >
-          ${escapeHtml(firstTime)}
-        </text>
-
-
-        <text
-          x="${width - padRight}"
-          y="${height - 7}"
-          text-anchor="end"
-          class="chart-label"
-        >
-          ${escapeHtml(lastTime)}
-        </text>
-
-      </svg>
-
-    </div>
-  `;
-
-
-  const stats =
-    document.getElementById("chartStats");
-
-  if (stats) {
-
-    const distance =
-      threshold !== 0
-        ? ((latest - threshold) / threshold) * 100
-        : 0;
-
-
-    stats.innerHTML = `
-
-      <div class="chart-stat asset">
-
-        <div class="k">
-          Current ${escapeHtml(asset)} price
-        </div>
-
-        <div class="v">
-          ${escapeHtml(formatPrice(latest))}
-        </div>
-
-      </div>
-
-
-      <div class="chart-stat threshold">
-
-        <div class="k">
-          Market threshold
-        </div>
-
-        <div class="v">
-          ${escapeHtml(formatPrice(threshold))}
-        </div>
-
-      </div>
-
-
-      <div class="chart-stat">
-
-        <div class="k">
-          Distance from threshold
-        </div>
-
-        <div
-          class="v"
-          style="
-            color:${
-              distance >= 0
-                ? "var(--gold)"
-                : "var(--rust)"
-            };
-          "
-        >
-          ${distance >= 0 ? "+" : ""}
-          ${distance.toFixed(2)}%
-        </div>
-
-      </div>
-
-
-      <div class="chart-stat">
-
-        <div class="k">
-          Data window
-        </div>
-
-        <div class="v">
-          24 hours
-        </div>
-
-      </div>
-
-    `;
-  }
-}
-
-
-// =====================================================================
-// SETTINGS
-// =====================================================================
-
-function openSettings() {
-
-  document.getElementById("cfgAddress").value =
-    state.cfg.address || "";
-
-  document.getElementById("cfgRpc").value =
-    state.cfg.rpc || "";
-
-  document.getElementById("cfgChainId").value =
-    state.cfg.chainId || "";
-
-  document
-    .getElementById("settingsOverlay")
-    .classList.add("show");
-}
-
-
-function closeSettings() {
-
-  document
-    .getElementById("settingsOverlay")
-    .classList.remove("show");
-}
-
-
-document.getElementById("settingsBtn").onclick =
-  openSettings;
-
-
-document.getElementById("cfgClose").onclick =
-  closeSettings;
-
-
-document.getElementById("cfgSave").onclick = () => {
-
-  const cfg = {
-
-    address:
-      document
-        .getElementById("cfgAddress")
-        .value
-        .trim(),
-
-    rpc:
-      document
-        .getElementById("cfgRpc")
-        .value
-        .trim(),
-
-    chainId:
-      document
-        .getElementById("cfgChainId")
-        .value
-        .trim(),
-
-  };
-
-
-  saveConfig(cfg);
-
-  state.readClient = null;
-  state.writeClient = null;
-
-  closeSettings();
-
-  toast(
-    "Settings saved",
-    ""
-  );
-
-
-  if (cfg.address) {
-    refreshMarkets();
-  }
 };
 
 
-// =====================================================================
-// BUTTONS
-// =====================================================================
+window.createMarket = async function() {
 
-document.getElementById("connectBtn").onclick =
-  connectWallet;
+  const button =
+    document.getElementById(
+      "createBtn"
+    );
 
-
-document.getElementById("refreshBtn").onclick =
-  () =>
-    ensureConfigured() &&
-    refreshMarkets();
-
-
-document.getElementById("newMarketBtn").onclick =
-  () => {
-
-    if (!ensureConfigured()) {
-      return;
-    }
-
-    document
-      .getElementById("newMarketOverlay")
-      .classList.add("show");
-  };
-
-
-document.getElementById("nmClose").onclick =
-  () =>
-    document
-      .getElementById("newMarketOverlay")
-      .classList.remove("show");
-
-
-// =====================================================================
-// NEW MARKET SOURCE
-// =====================================================================
-
-document.getElementById("nmAsset").onchange =
-  updateSourcePreview;
-
-
-updateSourcePreview();
-
-
-function updateSourcePreview() {
-
-  const asset =
-    document.getElementById("nmAsset").value;
-
-  document.getElementById("nmSource").value =
-    COIN_SOURCE[asset];
-}
-
-
-// =====================================================================
-// CREATE MARKET
-// =====================================================================
-
-document.getElementById("nmSubmit").onclick =
-  async () => {
-
-    const question =
-      document
-        .getElementById("nmQuestion")
-        .value
-        .trim();
+  try {
 
     const asset =
-      document.getElementById("nmAsset").value;
+      document.getElementById(
+        "nmAsset"
+      ).value;
+
+    const thresholdRaw =
+      document.getElementById(
+        "nmThreshold"
+      ).value;
+
+    const deadlineRaw =
+      document.getElementById(
+        "nmDeadline"
+      ).value;
 
     const threshold =
-      document
-        .getElementById("nmThreshold")
-        .value
-        .trim();
-
-    const deadlineLocal =
-      document
-        .getElementById("nmDeadline")
-        .value;
-
-    const source =
-      document
-        .getElementById("nmSource")
-        .value;
-
-
-    if (!question || question.length < 5) {
-
-      return toast(
-        "Question too short",
-        "Minimum 5 characters.",
-        "err"
-      );
-    }
-
+      Number(thresholdRaw);
 
     if (
-      !threshold ||
-      Number(threshold) <= 0
+      !Number.isFinite(threshold) ||
+      threshold <= 0
     ) {
 
-      return toast(
-        "Invalid threshold",
-        "",
-        "err"
+      throw new Error(
+        "Enter a valid threshold."
       );
+
     }
 
+    if (!deadlineRaw) {
 
-    if (!deadlineLocal) {
-
-      return toast(
-        "Pick a deadline",
-        "",
-        "err"
+      throw new Error(
+        "Select a market deadline."
       );
+
     }
 
+    const deadlineDate =
+      new Date(deadlineRaw);
+
+    if (
+      Number.isNaN(
+        deadlineDate.getTime()
+      )
+    ) {
+
+      throw new Error(
+        "Invalid deadline."
+      );
+
+    }
 
     const deadlineEpoch =
       Math.floor(
-        new Date(deadlineLocal).getTime() / 1000
+        deadlineDate.getTime() / 1000
       );
-
-
-    if (
-      deadlineEpoch <=
-      Math.floor(Date.now() / 1000)
-    ) {
-
-      return toast(
-        "Deadline must be in the future",
-        "",
-        "err"
-      );
-    }
-
-
-    const btn =
-      document.getElementById("nmSubmit");
-
-    btn.disabled = true;
-    btn.textContent = "Sending…";
-
-
-    try {
-
-      await callWrite(
-        "create_market",
-        [
-          question,
-          asset,
-          String(threshold),
-          String(deadlineEpoch),
-          source
-        ]
-      );
-
-
-      toast(
-        "Market created",
-        question,
-        "ok"
-      );
-
-
-      document
-        .getElementById("newMarketOverlay")
-        .classList.remove("show");
-
-
-      await refreshMarkets();
-
-    } catch (e) {
-
-      log(
-        "create_market error",
-        String(e)
-      );
-
-
-      toast(
-        "Failed to create market",
-        String(e.message || e),
-        "err"
-      );
-
-    } finally {
-
-      btn.disabled = false;
-      btn.textContent = "Create Market";
-
-    }
-
-  };
-
-
-// =====================================================================
-// MODAL BACKDROP
-// =====================================================================
-
-for (
-  const id of [
-    "settingsOverlay",
-    "newMarketOverlay"
-  ]
-) {
-
-  document
-    .getElementById(id)
-    .addEventListener(
-      "click",
-      (e) => {
-
-        if (e.target.id === id) {
-          e.currentTarget.classList.remove("show");
-        }
-
-      }
-    );
-}
-
-
-// =====================================================================
-// REFRESH MARKETS
-// =====================================================================
-
-async function refreshMarkets() {
-
-  const listEl =
-    document.getElementById("marketList");
-
-  listEl.innerHTML =
-    `<div class="empty">Loading…</div>`;
-
-
-  try {
-
-    const idsRaw =
-      await callView("list_markets");
-
-
-    const ids =
-      JSON.parse(idsRaw || "[]");
-
-
-    if (!ids.length) {
-
-      listEl.innerHTML =
-        `<div class="empty">No markets created yet.</div>`;
-
-      state.markets = [];
-
-      return;
-    }
-
-
-    const markets =
-      await Promise.all(
-        ids.map(
-          async id => {
-
-            try {
-
-              return JSON.parse(
-                await callView(
-                  "get_market",
-                  [id]
-                )
-              );
-
-            } catch {
-
-              return null;
-            }
-          }
-        )
-      );
-
-
-    state.markets =
-      markets
-        .filter(Boolean)
-        .reverse();
-
-
-    renderMarketList();
-
-
-    if (state.activeId) {
-
-      const still =
-        state.markets.find(
-          m => m.id === state.activeId
-        );
-
-
-      if (still) {
-        renderMarketDetail(still.id);
-      }
-    }
-
-  } catch (e) {
-
-    log(
-      "refreshMarkets error",
-      String(e)
-    );
-
-
-    listEl.innerHTML =
-      `<div class="empty">
-        Failed to read the contract.
-        Check the address/RPC in Settings.
-      </div>`;
-
-
-    toast(
-      "Failed to load markets",
-      String(e.message || e),
-      "err"
-    );
-  }
-}
-
-
-// =====================================================================
-// MARKET LIST
-// =====================================================================
-
-function renderMarketList() {
-
-  const listEl =
-    document.getElementById("marketList");
-
-
-  if (!state.markets.length) {
-
-    listEl.innerHTML =
-      `<div class="empty">No markets found.</div>`;
-
-    return;
-  }
-
-
-  listEl.innerHTML = "";
-
-
-  for (const m of state.markets) {
-
-    const row =
-      document.createElement("button");
-
-
-    row.className =
-      "market-row" +
-      (
-        m.id === state.activeId
-          ? " active"
-          : ""
-      );
-
-
-    const statusLabel = {
-
-      open: "Open",
-      resolved: "Resolved",
-      void: "Void"
-
-    }[m.status] || m.status;
-
-
-    row.innerHTML = `
-
-      <div class="q">
-        #${m.id} · ${escapeHtml(m.question)}
-      </div>
-
-      <div class="meta">
-
-        <span>
-          ${m.asset} @ $${escapeHtml(m.threshold)}
-        </span>
-
-        <span class="status-tag ${m.status}">
-          ${statusLabel}
-        </span>
-
-      </div>
-    `;
-
-
-    row.onclick =
-      () => renderMarketDetail(m.id);
-
-
-    listEl.appendChild(row);
-  }
-}
-
-
-// =====================================================================
-// MARKET DETAIL
-// =====================================================================
-
-async function renderMarketDetail(id) {
-
-  state.activeId = id;
-
-  renderMarketList();
-
-
-  const main =
-    document.getElementById("mainPanel");
-
-
-  main.innerHTML =
-    `<div class="empty">
-      Loading market #${id}…
-    </div>`;
-
-
-  try {
-
-    const market =
-      JSON.parse(
-        await callView(
-          "get_market",
-          [id]
-        )
-      );
-
-
-    const odds =
-      JSON.parse(
-        await callView(
-          "get_odds",
-          [id]
-        )
-      );
-
-
-    let position = {
-      yes: "0",
-      no: "0"
-    };
-
-
-    let claimed = false;
-
-
-    if (state.address) {
-
-      try {
-
-        position =
-          JSON.parse(
-            await callView(
-              "get_position",
-              [
-                id,
-                state.address
-              ]
-            )
-          );
-
-      } catch {}
-
-
-      try {
-
-        claimed =
-          (
-            await callView(
-              "has_claimed",
-              [
-                id,
-                state.address
-              ]
-            )
-          ) === "true";
-
-      } catch {}
-    }
-
 
     const now =
       Math.floor(
         Date.now() / 1000
       );
 
+    if (deadlineEpoch <= now) {
 
-    const deadline =
-      Number(market.deadline);
+      throw new Error(
+        "Deadline must be in the future."
+      );
+
+    }
+
+    button.disabled = true;
+    button.textContent =
+      "Creating...";
+
+    const tx =
+      await callWrite(
+        "create_market",
+        [
+          asset,
+          String(threshold),
+          String(deadlineEpoch)
+        ]
+      );
+
+    console.log(
+      "create_market result:",
+      tx
+    );
+
+    showToast(
+      "Market creation submitted.",
+      "success"
+    );
+
+    closeCreateModal();
+
+    setTimeout(
+      loadMarkets,
+      2500
+    );
+
+  } catch (error) {
+
+    console.error(
+      "create_market error:",
+      error
+    );
+
+    showToast(
+      error?.message ||
+      String(error),
+      "error"
+    );
+
+  } finally {
+
+    button.disabled = false;
+
+    button.textContent =
+      "Create Market";
+
+  }
+
+};
 
 
-    const past =
-      now >= deadline;
+/* =========================================================
+   Load Markets
+========================================================= */
 
+window.loadMarkets = async function() {
 
-    const yesPct =
-      (
-        Number(odds.yes_bps) / 100
-      ).toFixed(1);
+  const container =
+    document.getElementById(
+      "markets"
+    );
 
+  container.innerHTML = `
+    <div class="loading">
+      <span class="spinner"></span>
+      Loading markets...
+    </div>
+  `;
 
-    const noPct =
-      (
-        Number(odds.no_bps) / 100
-      ).toFixed(1);
+  try {
 
+    const result =
+      await callRead(
+        "list_markets",
+        []
+      );
 
-    const statusLabel = {
+    console.log(
+      "list_markets:",
+      result
+    );
 
-      open: "Open",
-      resolved: "Resolved",
-      void: "Void"
+    markets =
+      normalizeMarkets(result);
 
-    }[market.status] || market.status;
+    marketCount =
+      markets.length;
 
+    document.getElementById(
+      "marketCount"
+    ).textContent =
+      marketCount;
 
-    main.innerHTML = `
+    renderMarkets();
 
-      <div style="
-        display:flex;
-        justify-content:space-between;
-        align-items:flex-start;
-        gap:12px;
-        margin-bottom:6px;
-      ">
+  } catch (error) {
 
-        <h2 style="
-          color:var(--chalk);
-          font-family:var(--font-display);
-          font-size:19px;
-          font-weight:600;
-          margin:0;
-        ">
-          #${market.id} · ${escapeHtml(market.question)}
-        </h2>
+    console.error(
+      "list_markets error:",
+      error
+    );
 
-        <span class="status-tag ${market.status}">
-          ${statusLabel}
-        </span>
-
+    container.innerHTML = `
+      <div class="empty">
+        <strong>Could not load markets.</strong>
+        <br><br>
+        ${escapeHtml(
+          error?.message ||
+          String(error)
+        )}
+        <br><br>
+        <button
+          class="btn btn-small"
+          onclick="loadMarkets()"
+        >
+          Retry
+        </button>
       </div>
+    `;
+
+    document.getElementById(
+      "marketCount"
+    ).textContent =
+      "—";
+
+  }
+
+};
 
 
-      <p class="hint" style="margin-bottom:18px;">
+/* =========================================================
+   Normalize list
+========================================================= */
 
-        ${market.asset}
-        must ${past ? "have crossed" : "cross"}
-        $<span class="num">
-          ${escapeHtml(market.threshold)}
-        </span>
-        by ${fmtDate(deadline)}
-        —
-        ${
-          past
-            ? "deadline passed"
-            : "time left: " +
-              fmtRemaining(deadline - now)
+function normalizeMarkets(result) {
+
+  if (!result) {
+    return [];
+  }
+
+  if (Array.isArray(result)) {
+    return result;
+  }
+
+  if (
+    Array.isArray(result.markets)
+  ) {
+    return result.markets;
+  }
+
+  if (
+    typeof result === "object"
+  ) {
+
+    const values =
+      Object.values(result);
+
+    if (
+      values.length &&
+      values.every(
+        item =>
+          typeof item === "object"
+      )
+    ) {
+      return values;
+    }
+
+  }
+
+  return [];
+
+}
+
+
+/* =========================================================
+   NEW: Market card countdown timer
+========================================================= */
+
+function startMarketCountdowns() {
+
+  if (marketCountdownTimer) {
+
+    clearInterval(
+      marketCountdownTimer
+    );
+
+    marketCountdownTimer = null;
+
+  }
+
+  const update = () => {
+
+    const now =
+      Math.floor(
+        Date.now() / 1000
+      );
+
+    document
+      .querySelectorAll(
+        ".market-countdown"
+      )
+      .forEach(
+        element => {
+
+          const deadline =
+            getEpochSeconds(
+              element.dataset.deadline
+            );
+
+          const status =
+            element.dataset.status ||
+            "open";
+
+          if (
+            !Number.isFinite(deadline)
+          ) {
+
+            element.textContent =
+              "Deadline unavailable";
+
+            return;
+
+          }
+
+          const remaining =
+            deadline - now;
+
+          element.classList.remove(
+            "reached",
+            "resolved"
+          );
+
+          if (
+            status === "resolved"
+          ) {
+
+            element.classList.add(
+              "resolved"
+            );
+
+            element.textContent =
+              "✓ Market resolved";
+
+            return;
+
+          }
+
+          if (
+            remaining <= 0
+          ) {
+
+            element.classList.add(
+              "reached"
+            );
+
+            element.textContent =
+              "🔒 Deadline reached • Betting frozen";
+
+            return;
+
+          }
+
+          element.textContent =
+            `⏱ ${formatCountdown(remaining)} remaining`;
+
         }
+      );
 
-      </p>
+  };
+
+  update();
+
+  marketCountdownTimer =
+    setInterval(
+      update,
+      1000
+    );
+
+}
 
 
-      <!-- =========================================================
-           MARKET PRICE CHART
-           ========================================================= -->
+/* =========================================================
+   Render markets
+========================================================= */
 
-      <div class="market-chart-wrap">
+function renderMarkets() {
 
-        <div class="price-chart-card">
+  const container =
+    document.getElementById(
+      "markets"
+    );
 
-          <div id="priceChart">
+  if (!markets.length) {
 
-            <div class="chart-loading">
-              Loading ${escapeHtml(market.asset)} price chart…
+    if (marketCountdownTimer) {
+      clearInterval(marketCountdownTimer);
+      marketCountdownTimer = null;
+    }
+
+    container.innerHTML = `
+      <div class="empty">
+        No markets found yet.
+        <br><br>
+        Create the first market.
+      </div>
+    `;
+
+    return;
+
+  }
+
+  container.innerHTML =
+    markets.map(
+      market => {
+
+        const id =
+          market.id ??
+          market.market_id ??
+          market.marketId;
+
+        const asset =
+          String(
+            market.asset ||
+            "BTC"
+          ).toUpperCase();
+
+        const coin =
+          COINS[asset] ||
+          COINS.BTC;
+
+        const threshold =
+          market.threshold;
+
+        const status =
+          String(
+            market.status ||
+            "open"
+          ).toLowerCase();
+
+        const question =
+          market.question ||
+          `Will ${coin.name} (${asset}) be above ${formatUsd(threshold)} at the market deadline?`;
+
+        const deadline =
+          market.deadline;
+
+        const totalPool =
+          market.total_pool ??
+          market.totalPool ??
+          market.total ??
+          "0";
+
+        return `
+
+          <div
+            class="market-card"
+            onclick="openMarket('${escapeHtml(String(id))}')"
+          >
+
+            <div class="market-top">
+
+              <div class="coin">
+
+                <img
+                  src="${coin.logo}"
+                  alt="${coin.symbol}"
+                />
+
+                ${coin.symbol}
+
+              </div>
+
+              <div
+                class="status ${
+                  status === "resolved"
+                    ? "status-resolved"
+                    : "status-open"
+                }"
+              >
+                ${escapeHtml(status)}
+              </div>
+
             </div>
 
+            <div class="market-question">
+              ${escapeHtml(question)}
+            </div>
+
+            <div class="market-meta">
+
+              <div class="meta-box">
+
+                <div class="meta-label">
+                  Threshold
+                </div>
+
+                <div class="meta-value">
+                  ${formatUsd(threshold)}
+                </div>
+
+              </div>
+
+              <div class="meta-box">
+
+                <div class="meta-label">
+                  Pool
+                </div>
+
+                <div class="meta-value">
+                  ${formatNumber(totalPool)}
+                </div>
+
+              </div>
+
+            </div>
+
+            <!-- NEW: independent countdown for this market -->
+
+            <div
+              class="market-countdown"
+              data-deadline="${escapeHtml(String(deadline ?? ""))}"
+              data-status="${escapeHtml(status)}"
+            >
+              ${
+                status === "resolved"
+                  ? "✓ Market resolved"
+                  : "Loading countdown..."
+              }
+            </div>
+
+            <div class="market-footer">
+
+              <span>
+                ID #${escapeHtml(String(id))}
+              </span>
+
+              <span>
+                ${formatDate(deadline)}
+              </span>
+
+            </div>
+
+          </div>
+
+        `;
+
+      }
+    ).join("");
+
+  startMarketCountdowns();
+
+}
+
+
+/* =========================================================
+   Open market
+========================================================= */
+
+window.openMarket = async function(id) {
+
+  if (resolveCountdownTimer) {
+    clearInterval(resolveCountdownTimer);
+    resolveCountdownTimer = null;
+  }
+
+  selectedMarket = null;
+
+  selectedBetSide = "YES";
+
+  /* invalidate previous chart request */
+  chartRequestId++;
+
+  const modal =
+    document.getElementById(
+      "detailModal"
+    );
+
+  const content =
+    document.getElementById(
+      "detailContent"
+    );
+
+  document.getElementById(
+    "detailTitle"
+  ).textContent =
+    `Market #${id}`;
+
+  content.innerHTML = `
+    <div class="loading">
+      <span class="spinner"></span>
+      Loading market...
+    </div>
+  `;
+
+  modal.classList.add("show");
+
+  try {
+
+    const market =
+      await callRead(
+        "get_market",
+        [String(id)]
+      );
+
+    selectedMarket = {
+      id,
+      ...market
+    };
+
+    const odds =
+      await safeRead(
+        "get_odds",
+        [String(id)]
+      );
+
+    selectedMarket.odds =
+      odds;
+
+    renderMarketDetail();
+
+  } catch (error) {
+
+    console.error(
+      "get_market error:",
+      error
+    );
+
+    content.innerHTML = `
+      <div class="empty">
+        Failed to load market.
+        <br><br>
+        ${escapeHtml(
+          error?.message ||
+          String(error)
+        )}
+      </div>
+    `;
+
+  }
+
+};
+
+
+window.closeDetailModal = function() {
+
+  if (resolveCountdownTimer) {
+    clearInterval(resolveCountdownTimer);
+    resolveCountdownTimer = null;
+  }
+
+  chartRequestId++;
+
+  document
+    .getElementById(
+      "detailModal"
+    )
+    .classList.remove("show");
+
+};
+
+
+/* =========================================================
+   Safe read
+========================================================= */
+
+async function safeRead(
+  method,
+  args = []
+) {
+
+  try {
+
+    return await callRead(
+      method,
+      args
+    );
+
+  } catch (error) {
+
+    console.warn(
+      method,
+      error
+    );
+
+    return null;
+
+  }
+
+}
+
+
+/* =========================================================
+   NEW: freeze betting controls
+========================================================= */
+
+function setBetControlsLocked(
+  locked,
+  message = ""
+) {
+
+  const yes =
+    document.getElementById(
+      "yesSideBtn"
+    );
+
+  const no =
+    document.getElementById(
+      "noSideBtn"
+    );
+
+  const amount =
+    document.getElementById(
+      "betAmount"
+    );
+
+  const place =
+    document.getElementById(
+      "placeBetBtn"
+    );
+
+  const status =
+    document.getElementById(
+      "betLockMessage"
+    );
+
+  if (yes) {
+    yes.disabled = locked;
+  }
+
+  if (no) {
+    no.disabled = locked;
+  }
+
+  if (amount) {
+    amount.disabled = locked;
+  }
+
+  if (place) {
+    place.disabled = locked;
+  }
+
+  if (status) {
+
+    status.className =
+      locked
+        ? "bet-locked"
+        : "bet-open";
+
+    status.textContent =
+      message ||
+      (
+        locked
+          ? "🔒 Betting is frozen after the market deadline."
+          : "Betting is currently open."
+      );
+
+  }
+
+}
+
+
+/* =========================================================
+   Resolve countdown + betting freeze
+========================================================= */
+
+function startResolveCountdown(deadline) {
+
+  if (resolveCountdownTimer) {
+    clearInterval(resolveCountdownTimer);
+    resolveCountdownTimer = null;
+  }
+
+  const deadlineTimestamp =
+    getEpochSeconds(deadline);
+
+  if (!Number.isFinite(deadlineTimestamp)) {
+    return;
+  }
+
+  const updateCountdown = () => {
+
+    const button =
+      document.getElementById(
+        "resolveBtn"
+      );
+
+    const countdown =
+      document.getElementById(
+        "resolveCountdown"
+      );
+
+    const betStatus =
+      document.getElementById(
+        "betLockMessage"
+      );
+
+    const now =
+      Math.floor(
+        Date.now() / 1000
+      );
+
+    const remaining =
+      deadlineTimestamp - now;
+
+    /* =========================================
+       Deadline reached
+    ========================================= */
+
+    if (remaining <= 0) {
+
+      if (button) {
+
+        button.disabled = false;
+
+        button.textContent =
+          "Resolve Market";
+
+      }
+
+      if (countdown) {
+
+        countdown.classList.add(
+          "ready"
+        );
+
+        countdown.textContent =
+          "Deadline reached. Resolution is now available.";
+
+      }
+
+      setBetControlsLocked(
+        true,
+        "🔒 Deadline reached • Buying and selling are now frozen."
+      );
+
+      if (betStatus) {
+
+        betStatus.className =
+          "bet-locked";
+
+      }
+
+      clearInterval(
+        resolveCountdownTimer
+      );
+
+      resolveCountdownTimer = null;
+
+      return;
+
+    }
+
+
+    /* =========================================
+       Still before deadline
+    ========================================= */
+
+    if (button) {
+
+      button.disabled = true;
+
+      button.textContent =
+        "Resolve Market";
+
+    }
+
+    const text =
+      formatCountdown(
+        remaining
+      );
+
+    if (countdown) {
+
+      countdown.classList.remove(
+        "ready"
+      );
+
+      countdown.textContent =
+        `Resolution available in ${text}`;
+
+    }
+
+    setBetControlsLocked(
+      false,
+      `⏱ Betting open • ${text} remaining`
+    );
+
+  };
+
+  updateCountdown();
+
+  resolveCountdownTimer =
+    setInterval(
+      updateCountdown,
+      1000
+    );
+
+}
+
+
+/* =========================================================
+   Render detail
+========================================================= */
+
+async function renderMarketDetail() {
+
+  const market =
+    selectedMarket;
+
+  if (!market) {
+    return;
+  }
+
+  const id =
+    market.id;
+
+  const asset =
+    String(
+      market.asset ||
+      "BTC"
+    ).toUpperCase();
+
+  const coin =
+    COINS[asset] ||
+    COINS.BTC;
+
+  const question =
+    market.question ||
+    `Will ${coin.name} (${asset}) be above ${formatUsd(market.threshold)} at the market deadline?`;
+
+  const status =
+    String(
+      market.status ||
+      "open"
+    ).toLowerCase();
+
+  const content =
+    document.getElementById(
+      "detailContent"
+    );
+
+  let position = null;
+
+  if (account) {
+
+    position =
+      await safeRead(
+        "get_position",
+        [
+          String(id),
+          account
+        ]
+      );
+
+  }
+
+  let evidence = null;
+
+  if (status === "resolved") {
+
+    evidence =
+      await safeRead(
+        "get_resolution_evidence",
+        [String(id)]
+      );
+
+  }
+
+  const yesOdds =
+    extractOdds(
+      market.odds,
+      "yes"
+    );
+
+  const noOdds =
+    extractOdds(
+      market.odds,
+      "no"
+    );
+
+  const deadlineTimestamp =
+    getEpochSeconds(
+      market.deadline
+    );
+
+  const nowTimestamp =
+    Math.floor(
+      Date.now() / 1000
+    );
+
+  const deadlineReached =
+    Number.isFinite(deadlineTimestamp) &&
+    nowTimestamp >= deadlineTimestamp;
+
+  const bettingLocked =
+    status === "resolved" ||
+    deadlineReached;
+
+
+  content.innerHTML = `
+
+    <div class="detail-layout">
+
+      <div>
+
+        <div class="panel">
+
+          <div class="panel-title">
+            Market Question
+          </div>
+
+          <div class="detail-question">
+            ${escapeHtml(question)}
+          </div>
+
+          <div class="odds-grid">
+
+            <div class="odd-box">
+
+              <div class="odd-label">
+                YES
+              </div>
+
+              <div class="odd-value">
+                ${formatOddsValue(yesOdds)}
+              </div>
+
+            </div>
+
+            <div class="odd-box">
+
+              <div class="odd-label">
+                NO
+              </div>
+
+              <div class="odd-value">
+                ${formatOddsValue(noOdds)}
+              </div>
+
+            </div>
+
+          </div>
+
+        </div>
+
+
+        <!-- NEW: Market price chart -->
+
+        <div class="panel chart-panel">
+
+          <div class="chart-header">
+
+            <div>
+
+              <div class="chart-title">
+                ${escapeHtml(coin.name)} (${escapeHtml(asset)}) Price Chart
+              </div>
+
+              <div class="chart-subtitle">
+                ${
+                  deadlineReached || status === "resolved"
+                    ? "Historical price data around the market deadline."
+                    : "Recent price history. The threshold is shown on the chart."
+                }
+              </div>
+
+            </div>
+
+            <div class="chart-badge">
+              Threshold ${formatUsd(market.threshold)}
+            </div>
+
+          </div>
+
+          <div class="chart-container">
+
+            <canvas
+              id="marketPriceChart"
+            ></canvas>
+
+            <div
+              id="chartLoading"
+              class="chart-loading"
+            >
+              <span class="spinner"></span>
+              Loading ${escapeHtml(asset)} chart...
+            </div>
+
+          </div>
+
+          <div class="chart-legend">
+
+            <span class="legend-item">
+              <span class="legend-price"></span>
+              Price
+            </span>
+
+            <span class="legend-item">
+              <span class="legend-line"></span>
+              Threshold
+            </span>
+
+            <span class="legend-item">
+              <span class="legend-deadline"></span>
+              Deadline
+            </span>
+
+          </div>
+
+          <div
+            id="chartStatus"
+            class="hint"
+            style="margin-top:10px"
+          >
+            Loading market price data...
           </div>
 
         </div>
 
 
         <div
-          class="price-chart-card market-chart-stats"
-          id="chartStats"
+          class="panel"
+          style="margin-top:16px"
         >
 
-          <div class="chart-stat asset">
+          <div class="panel-title">
+            Market Interaction
+          </div>
 
-            <div class="k">
-              Asset
+          <div class="tabs">
+
+            <button
+              class="tab active"
+              onclick="switchTab('bet')"
+              id="tabBtnBet"
+            >
+              Place Bet
+            </button>
+
+            <button
+              class="tab"
+              onclick="switchTab('position')"
+              id="tabBtnPosition"
+            >
+              My Position
+            </button>
+
+            ${
+              status !== "resolved"
+                ? `
+                  <button
+                    class="tab"
+                    onclick="switchTab('resolve')"
+                    id="tabBtnResolve"
+                  >
+                    Resolve
+                  </button>
+                `
+                : ""
+            }
+
+            <button
+              class="tab"
+              onclick="switchTab('details')"
+              id="tabBtnDetails"
+            >
+              Details
+            </button>
+
+          </div>
+
+
+          <div
+            id="tab-bet"
+            class="tab-content active"
+          >
+
+            <div class="bet-grid">
+
+              <button
+                id="yesSideBtn"
+                class="side-btn ${
+                  selectedBetSide === "YES"
+                    ? "active"
+                    : ""
+                }"
+                onclick="selectBetSide('YES')"
+                ${bettingLocked ? "disabled" : ""}
+              >
+                YES
+              </button>
+
+              <button
+                id="noSideBtn"
+                class="side-btn ${
+                  selectedBetSide === "NO"
+                    ? "active"
+                    : ""
+                }"
+                onclick="selectBetSide('NO')"
+                ${bettingLocked ? "disabled" : ""}
+              >
+                NO
+              </button>
+
             </div>
 
-            <div class="v">
-              ${escapeHtml(market.asset)}
+
+            <div
+              class="form-group"
+              style="margin-top:15px"
+            >
+
+              <label>
+                Bet Amount
+              </label>
+
+              <input
+                id="betAmount"
+                type="number"
+                min="0"
+                step="0.000001"
+                placeholder="Amount"
+                ${bettingLocked ? "disabled" : ""}
+              />
+
+            </div>
+
+
+            <button
+              id="placeBetBtn"
+              class="btn btn-primary"
+              style="width:100%"
+              onclick="placeBet()"
+              ${bettingLocked ? "disabled" : ""}
+            >
+              ${
+                bettingLocked
+                  ? "Betting Frozen"
+                  : `Place ${selectedBetSide}`
+              }
+            </button>
+
+
+            <div
+              id="betLockMessage"
+              class="${
+                bettingLocked
+                  ? "bet-locked"
+                  : "bet-open"
+              }"
+            >
+              ${
+                status === "resolved"
+                  ? "🔒 Market resolved • Betting is frozen."
+                  : deadlineReached
+                    ? "🔒 Deadline reached • Buying and selling are now frozen."
+                    : `⏱ Betting open • ${formatCountdown(
+                        Math.max(
+                          0,
+                          deadlineTimestamp - nowTimestamp
+                        )
+                      )} remaining`
+              }
             </div>
 
           </div>
 
 
-          <div class="chart-stat threshold">
+          <div
+            id="tab-position"
+            class="tab-content"
+          >
 
-            <div class="k">
-              Threshold
-            </div>
-
-            <div class="v">
-              $${escapeHtml(market.threshold)}
-            </div>
+            ${
+              account
+                ? renderPosition(position)
+                : `
+                  <div class="empty">
+                    Connect your wallet to see your position.
+                  </div>
+                `
+            }
 
           </div>
 
 
-          <div class="chart-stat">
+          ${
+            status !== "resolved"
+              ? `
+                <div
+                  id="tab-resolve"
+                  class="tab-content"
+                >
 
-            <div class="k">
-              Chart period
-            </div>
+                  <div class="hint" style="margin-bottom:15px">
+                    Resolution uses the market's stored deadline and
+                    historical evidence. Validators independently verify
+                    the observation timestamp, price and outcome before
+                    consensus is persisted.
+                  </div>
 
-            <div class="v">
-              24 hours
-            </div>
+                  <button
+                    id="resolveBtn"
+                    class="btn btn-primary"
+                    style="width:100%"
+                    onclick="resolveMarket()"
+                    ${deadlineReached ? "" : "disabled"}
+                  >
+                    Resolve Market
+                  </button>
+
+                  <div
+                    id="resolveCountdown"
+                    class="resolve-countdown ${
+                      deadlineReached ? "ready" : ""
+                    }"
+                  >
+                    ${
+                      deadlineReached
+                        ? "Deadline reached. Resolution is now available."
+                        : "Waiting for market deadline..."
+                    }
+                  </div>
+
+                </div>
+              `
+              : ""
+          }
+
+
+          <div
+            id="tab-details"
+            class="tab-content"
+          >
+
+            ${renderMarketInfo(market)}
 
           </div>
 
@@ -2505,712 +3267,1982 @@ async function renderMarketDetail(id) {
       </div>
 
 
-      <div class="odds-board">
+      <div>
 
-        <div class="odds-face yes">
-
-          <div class="label">
-            YES
-          </div>
-
-          <div class="pct num">
-            ${yesPct}%
-          </div>
-
-          <div class="pool num">
-            ${fromWei(odds.yes_pool)} GEN
-          </div>
-
-        </div>
-
-
-        <div class="odds-face no">
-
-          <div class="label">
-            NO
-          </div>
-
-          <div class="pct num">
-            ${noPct}%
-          </div>
-
-          <div class="pool num">
-            ${fromWei(odds.no_pool)} GEN
-          </div>
-
-        </div>
+        ${
+          status === "resolved"
+            ? renderEvidencePanel(evidence)
+            : renderOpenStatusPanel(market)
+        }
 
       </div>
 
+    </div>
 
-      <div class="bar">
-        <div style="width:${yesPct}%"></div>
-      </div>
+  `;
 
+  if (status !== "resolved") {
 
-      <div class="divider"></div>
+    startResolveCountdown(
+      market.deadline
+    );
 
+  } else {
 
-      <div class="tabs">
+    setBetControlsLocked(
+      true,
+      "🔒 Market resolved • Buying and selling are frozen."
+    );
 
-        <button
-          data-tab="bet"
-          class="${state.activeTab === "bet" ? "active" : ""}"
-        >
-          Place Bet
-        </button>
+  }
 
-        <button
-          data-tab="manage"
-          class="${state.activeTab === "manage" ? "active" : ""}"
-        >
-          My Position / Resolve
-        </button>
+  /* Load chart after the market UI exists */
+  loadMarketChart(market);
 
-        <button
-          data-tab="info"
-          class="${state.activeTab === "info" ? "active" : ""}"
-        >
-          Details
-        </button>
-
-      </div>
+}
 
 
-      <div id="tabBody"></div>
-    `;
+/* =========================================================
+   NEW: Load CoinGecko chart
+========================================================= */
 
+async function loadMarketChart(
+  market
+) {
 
-    // Load chart independently.
-    // A chart failure must never break the contract UI.
-    loadPriceChart(
-      market.asset,
+  const canvas =
+    document.getElementById(
+      "marketPriceChart"
+    );
+
+  const loading =
+    document.getElementById(
+      "chartLoading"
+    );
+
+  const status =
+    document.getElementById(
+      "chartStatus"
+    );
+
+  if (!canvas) {
+    return;
+  }
+
+  const requestId =
+    ++chartRequestId;
+
+  const asset =
+    String(
+      market.asset ||
+      "BTC"
+    ).toUpperCase();
+
+  const coin =
+    COINS[asset] ||
+    COINS.BTC;
+
+  const deadline =
+    getEpochSeconds(
+      market.deadline
+    );
+
+  const threshold =
+    Number(
       market.threshold
     );
 
-
-    main
-      .querySelectorAll(".tabs button")
-      .forEach(
-        b =>
-          b.onclick = () => {
-
-            state.activeTab =
-              b.dataset.tab;
-
-            renderMarketDetail(id);
-          }
-      );
-
-
-    const body =
-      main.querySelector("#tabBody");
-
-
-    // ================================================================
-    // BET TAB
-    // ================================================================
-
-    if (state.activeTab === "bet") {
-
-      body.innerHTML = `
-
-        <div class="field">
-
-          <label>
-            Side
-          </label>
-
-          <div class="row2">
-
-            <button id="betYes" class="small">
-              YES
-            </button>
-
-            <button id="betNo" class="small">
-              NO
-            </button>
-
-          </div>
-
-        </div>
-
-
-        <div class="field">
-
-          <label for="betAmount">
-            Amount (GEN)
-          </label>
-
-          <input
-            id="betAmount"
-            class="num"
-            type="number"
-            step="any"
-            min="0"
-            placeholder="0.01"
-          >
-
-        </div>
-
-
-        <button
-          id="betSubmit"
-          class="primary"
-          ${past || market.status !== "open" ? "disabled" : ""}
-        >
-          Place Bet
-        </button>
-
-
-        ${
-          past || market.status !== "open"
-            ? `
-              <p class="hint">
-                This market is no longer open for betting.
-              </p>
-            `
-            : ""
-        }
-
-      `;
-
-
-      let side = "YES";
-
-
-      const yesBtn =
-        body.querySelector("#betYes");
-
-      const noBtn =
-        body.querySelector("#betNo");
-
-
-      const paint = () => {
-
-        yesBtn.style.borderColor =
-          side === "YES"
-            ? "var(--gold)"
-            : "";
-
-        noBtn.style.borderColor =
-          side === "NO"
-            ? "var(--rust)"
-            : "";
-      };
-
-
-      yesBtn.onclick = () => {
-
-        side = "YES";
-
-        paint();
-      };
-
-
-      noBtn.onclick = () => {
-
-        side = "NO";
-
-        paint();
-      };
-
-
-      paint();
-
-
-      body
-        .querySelector("#betSubmit")
-        .onclick =
-        async (e) => {
-
-          const amt =
-            body
-              .querySelector("#betAmount")
-              .value;
-
-
-          if (
-            !amt ||
-            Number(amt) <= 0
-          ) {
-
-            return toast(
-              "Invalid amount",
-              "",
-              "err"
-            );
-          }
-
-
-          e.target.disabled = true;
-          e.target.textContent = "Sending…";
-
-
-          try {
-
-            await callWrite(
-              "place_bet",
-              [
-                id,
-                side
-              ],
-              toWei(amt)
-            );
-
-
-            toast(
-              "Bet placed",
-              `${side} · ${amt} GEN`,
-              "ok"
-            );
-
-
-            await refreshMarkets();
-
-          } catch (err) {
-
-            toast(
-              "Bet failed",
-              String(
-                err.message || err
-              ),
-              "err"
-            );
-
-          } finally {
-
-            e.target.disabled = false;
-            e.target.textContent =
-              "Place Bet";
-          }
-
-        };
-    }
-
-
-    // ================================================================
-    // MANAGE TAB
-    // ================================================================
-
-    if (state.activeTab === "manage") {
-
-      const myYes =
-        fromWei(position.yes);
-
-      const myNo =
-        fromWei(position.no);
-
-
-      const canResolve =
-        past &&
-        market.status === "open";
-
-
-      const canClaim =
-        (
-          market.status === "resolved" ||
-          market.status === "void"
-        ) &&
-        !claimed &&
-        (
-          Number(position.yes) +
-          Number(position.no) > 0
-        );
-
-
-      const canVoid =
-        past &&
-        market.status === "open" &&
-        now >=
-        Number(
-          market.void_after || Infinity
-        );
-
-
-      body.innerHTML = `
-
-        <div class="kv">
-
-          <span class="k">
-            My position (YES)
-          </span>
-
-          <span class="num">
-            ${myYes} GEN
-          </span>
-
-        </div>
-
-
-        <div class="kv">
-
-          <span class="k">
-            My position (NO)
-          </span>
-
-          <span class="num">
-            ${myNo} GEN
-          </span>
-
-        </div>
-
-
-        ${
-          market.status === "resolved"
-            ? `
-              <div class="kv">
-
-                <span class="k">
-                  Outcome
-                </span>
-
-                <span class="num">
-                  ${market.outcome}
-                </span>
-
-              </div>
-            `
-            : ""
-        }
-
-
-        <div class="divider"></div>
-
-
-        <div style="
-          display:flex;
-          gap:10px;
-          flex-wrap:wrap;
-        ">
-
-          <button
-            id="resolveBtn"
-            ${canResolve ? "" : "disabled"}
-          >
-            Resolve Market
-          </button>
-
-
-          <button
-            id="voidBtn"
-            class="danger"
-            ${canVoid ? "" : "disabled"}
-          >
-            Void (after grace period)
-          </button>
-
-
-          <button
-            id="claimBtn"
-            class="primary"
-            ${canClaim ? "" : "disabled"}
-          >
-            ${claimed ? "Already claimed" : "Claim Payout"}
-          </button>
-
-        </div>
-
-
-        ${
-          !state.address
-            ? `
-              <p class="hint">
-                Connect a wallet to bet or claim.
-              </p>
-            `
-            : ""
-        }
-
-      `;
-
-
-      const wire =
-        (
-          elId,
-          fn,
-          args,
-          label
-        ) => {
-
-          const el =
-            body.querySelector(elId);
-
-
-          if (!el) {
-            return;
-          }
-
-
-          el.onclick =
-            async () => {
-
-              el.disabled = true;
-
-              const old =
-                el.textContent;
-
-              el.textContent =
-                "Sending…";
-
-
-              try {
-
-                await callWrite(
-                  fn,
-                  args
-                );
-
-
-                toast(
-                  label + " succeeded",
-                  ""
-                );
-
-
-                await refreshMarkets();
-
-              } catch (err) {
-
-                toast(
-                  label + " failed",
-                  String(
-                    err.message || err
-                  ),
-                  "err"
-                );
-
-              } finally {
-
-                el.disabled = false;
-                el.textContent = old;
-
-              }
-
-            };
-        };
-
-
-      wire(
-        "#resolveBtn",
-        "resolve_market",
-        [id],
-        "Resolve"
-      );
-
-
-      wire(
-        "#voidBtn",
-        "void_market",
-        [id],
-        "Void"
-      );
-
-
-      wire(
-        "#claimBtn",
-        "claim",
-        [id],
-        "Claim"
-      );
-    }
-
-
-    // ================================================================
-    // INFO TAB
-    // ================================================================
-
-    if (state.activeTab === "info") {
-
-      body.innerHTML = `
-
-        <div class="kv">
-
-          <span class="k">
-            Creator
-          </span>
-
-          <span class="num">
-            ${shortAddr(market.creator)}
-          </span>
-
-        </div>
-
-
-        <div class="kv">
-
-          <span class="k">
-            Resolution source
-          </span>
-
-          <span
-            class="num"
-            style="word-break:break-all;"
-          >
-            ${escapeHtml(market.resolution_source)}
-          </span>
-
-        </div>
-
-
-        <div class="kv">
-
-          <span class="k">
-            Created
-          </span>
-
-          <span class="num">
-            ${fmtDate(Number(market.created_at))}
-          </span>
-
-        </div>
-
-
-        <div class="kv">
-
-          <span class="k">
-            Deadline
-          </span>
-
-          <span class="num">
-            ${fmtDate(deadline)}
-          </span>
-
-        </div>
-
-
-        ${
-          market.resolved_price
-            ? `
-              <div class="kv">
-
-                <span class="k">
-                  Resolved price
-                </span>
-
-                <span class="num">
-                  $${escapeHtml(market.resolved_price)}
-                </span>
-
-              </div>
-            `
-            : ""
-        }
-
-
-        ${
-          market.resolved_at
-            ? `
-              <div class="kv">
-
-                <span class="k">
-                  Resolved at
-                </span>
-
-                <span class="num">
-                  ${fmtDate(Number(market.resolved_at))}
-                </span>
-
-              </div>
-            `
-            : ""
-        }
-
-      `;
-    }
-
-  } catch (e) {
-
-    log(
-      "renderMarketDetail error",
-      String(e)
+  const now =
+    Math.floor(
+      Date.now() / 1000
     );
 
+  try {
 
-    main.innerHTML =
-      `<div class="empty">
-        Failed to load market #${id}.
-      </div>`;
+    let url;
+
+    /*
+      Resolved / expired:
+      Get historical data around the stored deadline.
+
+      Open:
+      Get the most recent 24h of data.
+    */
+
+    if (
+      Number.isFinite(deadline) &&
+      deadline <= now
+    ) {
+
+      const from =
+        deadline -
+        24 * 60 * 60;
+
+      const to =
+        Math.min(
+          deadline +
+          60 * 60,
+          now
+        );
+
+      url =
+        `https://api.coingecko.com/api/v3/coins/${encodeURIComponent(
+          coin.coinId
+        )}/market_chart/range?vs_currency=usd&from=${from}&to=${to}`;
+
+    } else {
+
+      url =
+        `https://api.coingecko.com/api/v3/coins/${encodeURIComponent(
+          coin.coinId
+        )}/market_chart?vs_currency=usd&days=1&interval=hourly`;
+
+    }
+
+    const response =
+      await fetch(
+        url,
+        {
+          method: "GET",
+          headers: {
+            Accept: "application/json"
+          }
+        }
+      );
+
+    if (!response.ok) {
+
+      throw new Error(
+        `CoinGecko HTTP ${response.status}`
+      );
+
+    }
+
+    const data =
+      await response.json();
+
+    const prices =
+      Array.isArray(data?.prices)
+        ? data.prices
+        : [];
+
+    if (
+      requestId !== chartRequestId
+    ) {
+      return;
+    }
+
+    if (!prices.length) {
+
+      throw new Error(
+        "No price data returned."
+      );
+
+    }
+
+    drawPriceChart(
+      canvas,
+      prices,
+      threshold,
+      deadline
+    );
+
+    if (loading) {
+      loading.classList.add(
+        "hidden"
+      );
+    }
+
+    if (status) {
+
+      const label =
+        deadline <= now
+          ? "Historical data around the market deadline."
+          : "Recent 24h CoinGecko price history.";
+
+      status.textContent =
+        `${label} Threshold: ${formatUsd(threshold)} • Deadline: ${formatDate(market.deadline)}`;
+
+    }
+
+  } catch (error) {
+
+    console.error(
+      "CoinGecko chart:",
+      error
+    );
+
+    if (
+      requestId !== chartRequestId
+    ) {
+      return;
+    }
+
+    if (loading) {
+      loading.classList.add(
+        "hidden"
+      );
+    }
+
+    if (status) {
+
+      status.textContent =
+        "Chart data could not be loaded right now. The market itself is unaffected.";
+
+    }
+
   }
+
 }
 
 
-// =====================================================================
-// DATE HELPERS
-// =====================================================================
+/* =========================================================
+   NEW: Draw chart using Canvas
+========================================================= */
 
-function fmtDate(epoch) {
+function drawPriceChart(
+  canvas,
+  prices,
+  threshold,
+  deadline
+) {
 
-  if (!epoch) {
+  const rect =
+    canvas.getBoundingClientRect();
+
+  const dpr =
+    window.devicePixelRatio ||
+    1;
+
+  const width =
+    Math.max(
+      300,
+      Math.floor(rect.width)
+    );
+
+  const height =
+    Math.max(
+      200,
+      Math.floor(rect.height)
+    );
+
+  canvas.width =
+    width * dpr;
+
+  canvas.height =
+    height * dpr;
+
+  const ctx =
+    canvas.getContext(
+      "2d"
+    );
+
+  ctx.setTransform(
+    dpr,
+    0,
+    0,
+    dpr,
+    0,
+    0
+  );
+
+  ctx.clearRect(
+    0,
+    0,
+    width,
+    height
+  );
+
+  const points =
+    prices
+      .map(
+        item => ({
+          time: Number(item[0]),
+          price: Number(item[1])
+        })
+      )
+      .filter(
+        item =>
+          Number.isFinite(item.time) &&
+          Number.isFinite(item.price)
+      );
+
+  if (!points.length) {
+    return;
+  }
+
+  /*
+    Include threshold in the Y range so that
+    the threshold line is always visible.
+  */
+
+  const priceValues =
+    points.map(
+      point => point.price
+    );
+
+  if (
+    Number.isFinite(threshold)
+  ) {
+
+    priceValues.push(
+      threshold
+    );
+
+  }
+
+  let minPrice =
+    Math.min(
+      ...priceValues
+    );
+
+  let maxPrice =
+    Math.max(
+      ...priceValues
+    );
+
+  if (
+    minPrice === maxPrice
+  ) {
+
+    const padding =
+      Math.max(
+        1,
+        minPrice * 0.01
+      );
+
+    minPrice -= padding;
+    maxPrice += padding;
+
+  }
+
+  const range =
+    maxPrice -
+    minPrice;
+
+  minPrice -=
+    range * 0.08;
+
+  maxPrice +=
+    range * 0.08;
+
+  const left =
+    58;
+
+  const right =
+    16;
+
+  const top =
+    18;
+
+  const bottom =
+    38;
+
+  const chartWidth =
+    width -
+    left -
+    right;
+
+  const chartHeight =
+    height -
+    top -
+    bottom;
+
+  const firstTime =
+    points[0].time;
+
+  const lastTime =
+    points[points.length - 1].time;
+
+  const timeRange =
+    Math.max(
+      1,
+      lastTime -
+      firstTime
+    );
+
+  const xFor =
+    time => {
+
+      return (
+        left +
+        (
+          (time - firstTime) /
+          timeRange
+        ) *
+        chartWidth
+      );
+
+    };
+
+  const yFor =
+    price => {
+
+      return (
+        top +
+        (
+          1 -
+          (
+            (price - minPrice) /
+            (maxPrice - minPrice)
+          )
+        ) *
+        chartHeight
+      );
+
+    };
+
+
+  /* Background */
+
+  ctx.fillStyle =
+    "rgba(7,17,13,0.95)";
+
+  ctx.fillRect(
+    0,
+    0,
+    width,
+    height
+  );
+
+
+  /* Grid */
+
+  ctx.strokeStyle =
+    "rgba(255,255,255,0.055)";
+
+  ctx.lineWidth =
+    1;
+
+  const gridLines =
+    5;
+
+  ctx.font =
+    "10px Inter, system-ui, sans-serif";
+
+  ctx.fillStyle =
+    "#65736a";
+
+  for (
+    let i = 0;
+    i <= gridLines;
+    i++
+  ) {
+
+    const y =
+      top +
+      (
+        chartHeight /
+        gridLines
+      ) *
+      i;
+
+    ctx.beginPath();
+
+    ctx.moveTo(
+      left,
+      y
+    );
+
+    ctx.lineTo(
+      width - right,
+      y
+    );
+
+    ctx.stroke();
+
+    const price =
+      maxPrice -
+      (
+        (
+          maxPrice -
+          minPrice
+        ) /
+        gridLines
+      ) *
+      i;
+
+    ctx.fillText(
+      formatCompactPrice(price),
+      8,
+      y + 3
+    );
+
+  }
+
+
+  /* Threshold line */
+
+  if (
+    Number.isFinite(threshold) &&
+    threshold >= minPrice &&
+    threshold <= maxPrice
+  ) {
+
+    const thresholdY =
+      yFor(threshold);
+
+    ctx.save();
+
+    ctx.strokeStyle =
+      "#d5b76c";
+
+    ctx.lineWidth =
+      1.5;
+
+    ctx.setLineDash([
+      6,
+      5
+    ]);
+
+    ctx.beginPath();
+
+    ctx.moveTo(
+      left,
+      thresholdY
+    );
+
+    ctx.lineTo(
+      width - right,
+      thresholdY
+    );
+
+    ctx.stroke();
+
+    ctx.restore();
+
+    ctx.fillStyle =
+      "#d5b76c";
+
+    ctx.font =
+      "bold 10px Inter, system-ui, sans-serif";
+
+    ctx.fillText(
+      `Threshold ${formatCompactPrice(threshold)}`,
+      left + 6,
+      Math.max(
+        12,
+        thresholdY - 6
+      )
+    );
+
+  }
+
+
+  /* Price line */
+
+  ctx.beginPath();
+
+  points.forEach(
+    (point, index) => {
+
+      const x =
+        xFor(point.time);
+
+      const y =
+        yFor(point.price);
+
+      if (index === 0) {
+
+        ctx.moveTo(
+          x,
+          y
+        );
+
+      } else {
+
+        ctx.lineTo(
+          x,
+          y
+        );
+
+      }
+
+    }
+  );
+
+  ctx.strokeStyle =
+    "#79dfa1";
+
+  ctx.lineWidth =
+    2;
+
+  ctx.lineJoin =
+    "round";
+
+  ctx.lineCap =
+    "round";
+
+  ctx.stroke();
+
+
+  /* Gradient-like area below line */
+
+  const firstX =
+    xFor(
+      points[0].time
+    );
+
+  const lastX =
+    xFor(
+      points[points.length - 1].time
+    );
+
+  const bottomY =
+    top +
+    chartHeight;
+
+  const area =
+    ctx.createLinearGradient(
+      0,
+      top,
+      0,
+      bottomY
+    );
+
+  area.addColorStop(
+    0,
+    "rgba(121,223,161,0.12)"
+  );
+
+  area.addColorStop(
+    1,
+    "rgba(121,223,161,0)"
+  );
+
+  ctx.beginPath();
+
+  points.forEach(
+    (point, index) => {
+
+      const x =
+        xFor(point.time);
+
+      const y =
+        yFor(point.price);
+
+      if (index === 0) {
+        ctx.moveTo(
+          x,
+          y
+        );
+      } else {
+        ctx.lineTo(
+          x,
+          y
+        );
+      }
+
+    }
+  );
+
+  ctx.lineTo(
+    lastX,
+    bottomY
+  );
+
+  ctx.lineTo(
+    firstX,
+    bottomY
+  );
+
+  ctx.closePath();
+
+  ctx.fillStyle =
+    area;
+
+  ctx.fill();
+
+
+  /* Deadline marker */
+
+  if (
+    Number.isFinite(deadline) &&
+    deadline >= firstTime &&
+    deadline <= lastTime
+  ) {
+
+    const deadlineMs =
+      deadline * 1000;
+
+    const deadlineX =
+      xFor(
+        deadlineMs
+      );
+
+    ctx.save();
+
+    ctx.strokeStyle =
+      "#ef9c9c";
+
+    ctx.lineWidth =
+      1.5;
+
+    ctx.setLineDash([
+      4,
+      5
+    ]);
+
+    ctx.beginPath();
+
+    ctx.moveTo(
+      deadlineX,
+      top
+    );
+
+    ctx.lineTo(
+      deadlineX,
+      bottomY
+    );
+
+    ctx.stroke();
+
+    ctx.restore();
+
+    ctx.fillStyle =
+      "#ef9c9c";
+
+    ctx.font =
+      "bold 10px Inter, system-ui, sans-serif";
+
+    ctx.fillText(
+      "Deadline",
+      Math.min(
+        deadlineX + 5,
+        width - 55
+      ),
+      top + 12
+    );
+
+  }
+
+
+  /* Last price point */
+
+  const last =
+    points[points.length - 1];
+
+  const lastXPoint =
+    xFor(last.time);
+
+  const lastYPoint =
+    yFor(last.price);
+
+  ctx.beginPath();
+
+  ctx.arc(
+    lastXPoint,
+    lastYPoint,
+    3.5,
+    0,
+    Math.PI * 2
+  );
+
+  ctx.fillStyle =
+    "#79dfa1";
+
+  ctx.fill();
+
+  ctx.fillStyle =
+    "#d9e9dd";
+
+  ctx.font =
+    "bold 10px Inter, system-ui, sans-serif";
+
+  const label =
+    formatCompactPrice(
+      last.price
+    );
+
+  ctx.fillText(
+    label,
+    Math.min(
+      lastXPoint + 7,
+      width - 60
+    ),
+    Math.max(
+      14,
+      lastYPoint - 7
+    )
+  );
+
+
+  /* X-axis labels */
+
+  ctx.fillStyle =
+    "#65736a";
+
+  ctx.font =
+    "10px Inter, system-ui, sans-serif";
+
+  const startDate =
+    new Date(
+      firstTime
+    );
+
+  const endDate =
+    new Date(
+      lastTime
+    );
+
+  ctx.fillText(
+    formatChartTime(startDate),
+    left,
+    height - 12
+  );
+
+  const endLabel =
+    formatChartTime(endDate);
+
+  const endWidth =
+    ctx.measureText(
+      endLabel
+    ).width;
+
+  ctx.fillText(
+    endLabel,
+    width - right - endWidth,
+    height - 12
+  );
+
+}
+
+
+/* =========================================================
+   NEW: chart helpers
+========================================================= */
+
+function formatCompactPrice(
+  value
+) {
+
+  const n =
+    Number(value);
+
+  if (!Number.isFinite(n)) {
     return "—";
   }
 
-  return new Date(
-    epoch * 1000
-  ).toLocaleString();
-}
+  if (n >= 1000000) {
 
+    return (
+      "$" +
+      (n / 1000000).toFixed(2) +
+      "M"
+    );
 
-function fmtRemaining(sec) {
-
-  if (sec <= 0) {
-    return "ended";
   }
 
+  if (n >= 1000) {
 
-  const d =
-    Math.floor(sec / 86400);
-
-  const h =
-    Math.floor(
-      (sec % 86400) / 3600
+    return (
+      "$" +
+      (n / 1000).toFixed(1) +
+      "K"
     );
 
-  const m =
-    Math.floor(
-      (sec % 3600) / 60
+  }
+
+  if (n >= 1) {
+
+    return (
+      "$" +
+      n.toFixed(2)
     );
 
+  }
 
-  return [
+  return (
+    "$" +
+    n.toFixed(4)
+  );
 
-    d ? `${d}d` : "",
-
-    h ? `${h}h` : "",
-
-    m ? `${m}m` : ""
-
-  ]
-    .filter(Boolean)
-    .join(" ") ||
-    "under a minute";
 }
 
 
-// =====================================================================
-// INITIAL LOAD
-// =====================================================================
+function formatChartTime(
+  date
+) {
 
-document.getElementById("netLabel").textContent =
-  "GenLayer Studio · #61999";
+  if (
+    !(date instanceof Date) ||
+    Number.isNaN(date.getTime())
+  ) {
+    return "";
+  }
 
-refreshMarkets();
+  return date.toLocaleDateString(
+    undefined,
+    {
+      month: "short",
+      day: "numeric"
+    }
+  ) + " " +
+  date.toLocaleTimeString(
+    undefined,
+    {
+      hour: "2-digit",
+      minute: "2-digit"
+    }
+  );
+
+}
 
 
-// =====================================================================
-// AUTO REFRESH
-// =====================================================================
+/* =========================================================
+   Odds
+========================================================= */
 
-setInterval(
-  () => {
+function extractOdds(
+  odds,
+  side
+) {
 
-    if (state.cfg.address) {
-      refreshMarkets();
+  if (!odds) {
+    return null;
+  }
+
+  const lower =
+    side.toLowerCase();
+
+  if (
+    odds[lower] !== undefined
+  ) {
+    return odds[lower];
+  }
+
+  if (
+    odds[side.toUpperCase()] !== undefined
+  ) {
+    return odds[side.toUpperCase()];
+  }
+
+  if (
+    odds[lower + "_odds"] !== undefined
+  ) {
+    return odds[lower + "_odds"];
+  }
+
+  if (
+    odds[lower + "_probability"] !== undefined
+  ) {
+    return odds[lower + "_probability"];
+  }
+
+  return null;
+
+}
+
+
+function formatOddsValue(value) {
+
+  if (
+    value === null ||
+    value === undefined
+  ) {
+    return "—";
+  }
+
+  if (
+    typeof value === "number"
+  ) {
+
+    if (value <= 1) {
+      return (
+        value * 100
+      ).toFixed(1) + "%";
     }
 
-  },
-  30000
+    return value.toFixed(1) + "%";
+
+  }
+
+  const n = Number(value);
+
+  if (Number.isFinite(n)) {
+
+    if (n <= 1) {
+      return (
+        n * 100
+      ).toFixed(1) + "%";
+    }
+
+    return n.toFixed(1) + "%";
+
+  }
+
+  return String(value);
+
+}
+
+
+/* =========================================================
+   Position
+========================================================= */
+
+function renderPosition(position) {
+
+  if (!position) {
+
+    return `
+      <div class="empty">
+        No position found.
+      </div>
+    `;
+
+  }
+
+  const yes =
+    position.yes ??
+    position.YES ??
+    "0";
+
+  const no =
+    position.no ??
+    position.NO ??
+    "0";
+
+  const total =
+    position.total ??
+    position.total_bet ??
+    "0";
+
+  return `
+
+    <div class="detail-row">
+      <div class="detail-label">
+        YES
+      </div>
+      <div class="detail-value">
+        ${formatNumber(yes)}
+      </div>
+    </div>
+
+    <div class="detail-row">
+      <div class="detail-label">
+        NO
+      </div>
+      <div class="detail-value">
+        ${formatNumber(no)}
+      </div>
+    </div>
+
+    <div class="detail-row">
+      <div class="detail-label">
+        Total
+      </div>
+      <div class="detail-value">
+        ${formatNumber(total)}
+      </div>
+    </div>
+
+  `;
+
+}
+
+
+/* =========================================================
+   Market info
+========================================================= */
+
+function renderMarketInfo(
+  market
+) {
+
+  return `
+
+    <div class="detail-row">
+
+      <div class="detail-label">
+        Market ID
+      </div>
+
+      <div class="detail-value">
+        ${escapeHtml(String(market.id))}
+      </div>
+
+    </div>
+
+
+    <div class="detail-row">
+
+      <div class="detail-label">
+        Asset
+      </div>
+
+      <div class="detail-value">
+        ${escapeHtml(market.asset || "—")}
+      </div>
+
+    </div>
+
+
+    <div class="detail-row">
+
+      <div class="detail-label">
+        Threshold
+      </div>
+
+      <div class="detail-value">
+        ${formatUsd(market.threshold)}
+      </div>
+
+    </div>
+
+
+    <div class="detail-row">
+
+      <div class="detail-label">
+        Deadline
+      </div>
+
+      <div class="detail-value">
+        ${formatDate(market.deadline)}
+      </div>
+
+    </div>
+
+
+    <div class="detail-row">
+
+      <div class="detail-label">
+        Status
+      </div>
+
+      <div class="detail-value">
+        ${escapeHtml(market.status || "—")}
+      </div>
+
+    </div>
+
+
+    ${
+      market.outcome !== undefined
+        ? `
+          <div class="detail-row">
+
+            <div class="detail-label">
+              Outcome
+            </div>
+
+            <div class="detail-value">
+              ${escapeHtml(String(market.outcome))}
+            </div>
+
+          </div>
+        `
+        : ""
+    }
+
+  `;
+
+}
+
+
+/* =========================================================
+   Open status
+========================================================= */
+
+function renderOpenStatusPanel(
+  market
+) {
+
+  const deadlineTimestamp =
+    getEpochSeconds(
+      market.deadline
+    );
+
+  const nowTimestamp =
+    Math.floor(
+      Date.now() / 1000
+    );
+
+  const deadlineReached =
+    Number.isFinite(deadlineTimestamp) &&
+    nowTimestamp >= deadlineTimestamp;
+
+  return `
+
+    <div class="panel">
+
+      <div class="panel-title">
+        Settlement
+      </div>
+
+      <div class="hint">
+
+        This market is still open.
+
+        <br><br>
+
+        When resolved, the contract will retrieve
+        historical evidence around the stored deadline,
+        then validators will independently verify
+        the observation time, price and outcome.
+
+      </div>
+
+      <div
+        class="detail-row"
+        style="margin-top:15px"
+      >
+
+        <div class="detail-label">
+          Deadline
+        </div>
+
+        <div class="detail-value">
+          ${formatDate(market.deadline)}
+        </div>
+
+      </div>
+
+      <div
+        class="detail-row"
+      >
+
+        <div class="detail-label">
+          Resolution
+        </div>
+
+        <div class="detail-value">
+          ${
+            deadlineReached
+              ? "Available"
+              : "Waiting for deadline"
+          }
+        </div>
+
+      </div>
+
+    </div>
+
+  `;
+
+}
+
+
+/* =========================================================
+   Resolution evidence
+========================================================= */
+
+function renderEvidencePanel(
+  evidence
+) {
+
+  if (!evidence) {
+
+    return `
+
+      <div class="panel">
+
+        <div class="panel-title">
+          Resolution Evidence
+        </div>
+
+        <div class="hint">
+          The market is resolved, but resolution evidence
+          could not be loaded.
+        </div>
+
+      </div>
+
+    `;
+
+  }
+
+  const nested =
+    evidence.evidence &&
+    typeof evidence.evidence === "object"
+      ? evidence.evidence
+      : evidence;
+
+  const source =
+    nested.source ||
+    nested.evidence_source ||
+    "—";
+
+  const observedAt =
+    nested.observed_at ||
+    nested.evidence_observed_at;
+
+  const price =
+    nested.price ??
+    nested.evidence_price;
+
+  const distance =
+    nested.distance_seconds ??
+    nested.evidence_distance_seconds;
+
+  const outcome =
+    nested.outcome ||
+    "—";
+
+  return `
+
+    <div class="panel">
+
+      <div class="panel-title">
+        Verified Resolution Evidence
+      </div>
+
+
+      <div class="detail-row">
+
+        <div class="detail-label">
+          Outcome
+        </div>
+
+        <div class="detail-value">
+          ${escapeHtml(String(outcome))}
+        </div>
+
+      </div>
+
+
+      <div class="detail-row">
+
+        <div class="detail-label">
+          Observed Price
+        </div>
+
+        <div class="detail-value">
+          ${formatUsd(price)}
+        </div>
+
+      </div>
+
+
+      <div class="detail-row">
+
+        <div class="detail-label">
+          Observation Time
+        </div>
+
+        <div class="detail-value">
+          ${formatDate(observedAt)}
+        </div>
+
+      </div>
+
+
+      <div class="detail-row">
+
+        <div class="detail-label">
+          Distance From Deadline
+        </div>
+
+        <div class="detail-value">
+          ${
+            distance === null ||
+            distance === undefined
+              ? "—"
+              : `${formatNumber(distance)} sec`
+          }
+        </div>
+
+      </div>
+
+
+      <div
+        style="margin-top:15px"
+        class="hint"
+      >
+        Stored evidence source
+      </div>
+
+
+      <div
+        class="code-box"
+        style="margin-top:7px"
+      >
+        ${escapeHtml(String(source))}
+      </div>
+
+    </div>
+
+  `;
+
+}
+
+
+/* =========================================================
+   Tabs
+========================================================= */
+
+window.switchTab = function(
+  tab
+) {
+
+  document
+    .querySelectorAll(
+      ".tab-content"
+    )
+    .forEach(
+      element =>
+        element.classList.remove(
+          "active"
+        )
+    );
+
+  document
+    .querySelectorAll(
+      ".tab"
+    )
+    .forEach(
+      element =>
+        element.classList.remove(
+          "active"
+        )
+    );
+
+  const content =
+    document.getElementById(
+      `tab-${tab}`
+    );
+
+  if (content) {
+
+    content.classList.add(
+      "active"
+    );
+
+  }
+
+  const button =
+    document.getElementById(
+      `tabBtn${
+        tab.charAt(0).toUpperCase() +
+        tab.slice(1)
+      }`
+    );
+
+  if (button) {
+
+    button.classList.add(
+      "active"
+    );
+
+  }
+
+};
+
+
+/* =========================================================
+   Bet side
+========================================================= */
+
+window.selectBetSide = function(
+  side
+) {
+
+  const yes =
+    document.getElementById(
+      "yesSideBtn"
+    );
+
+  const no =
+    document.getElementById(
+      "noSideBtn"
+    );
+
+  if (
+    yes?.disabled ||
+    no?.disabled
+  ) {
+
+    return;
+
+  }
+
+  selectedBetSide =
+    side;
+
+  document
+    .getElementById(
+      "yesSideBtn"
+    )
+    ?.classList.toggle(
+      "active",
+      side === "YES"
+    );
+
+  document
+    .getElementById(
+      "noSideBtn"
+    )
+    ?.classList.toggle(
+      "active",
+      side === "NO"
+    );
+
+  const place =
+    document.getElementById(
+      "placeBetBtn"
+    );
+
+  if (place) {
+
+    place.textContent =
+      `Place ${side}`;
+
+  }
+
+};
+
+
+/* =========================================================
+   Place bet
+========================================================= */
+
+window.placeBet = async function() {
+
+  try {
+
+    if (!account) {
+
+      await connectWallet();
+
+    }
+
+    if (!account) {
+
+      throw new Error(
+        "Connect your wallet first."
+      );
+
+    }
+
+    if (!selectedMarket) {
+
+      throw new Error(
+        "No market selected."
+      );
+
+    }
+
+    /*
+      IMPORTANT:
+      Re-check the deadline immediately before
+      sending the transaction.
+      
+      This prevents a bet from being submitted if
+      the timer reached zero while the user was
+      interacting with the page.
+    */
+
+    const deadline =
+      getEpochSeconds(
+        selectedMarket.deadline
+      );
+
+    const now =
+      Math.floor(
+        Date.now() / 1000
+      );
+
+    if (
+      !Number.isFinite(deadline)
+    ) {
+
+      throw new Error(
+        "Market deadline is invalid."
+      );
+
+    }
+
+    if (
+      now >= deadline
+    ) {
+
+      setBetControlsLocked(
+        true,
+        "🔒 Deadline reached • Buying and selling are now frozen."
+      );
+
+      throw new Error(
+        "The market deadline has been reached. Betting is frozen."
+      );
+
+    }
+
+    const amount =
+      document.getElementById(
+        "betAmount"
+      ).value;
+
+    if (
+      !amount ||
+      Number(amount) <= 0
+    ) {
+
+      throw new Error(
+        "Enter a valid bet amount."
+      );
+
+    }
+
+    showToast(
+      "Submitting bet...",
+      ""
+    );
+
+    const tx =
+      await callWrite(
+        "place_bet",
+        [
+          String(
+            selectedMarket.id
+          ),
+          selectedBetSide
+        ],
+        String(amount)
+      );
+
+    console.log(
+      "place_bet result:",
+      tx
+    );
+
+    showToast(
+      "Bet submitted successfully.",
+      "success"
+    );
+
+    setTimeout(
+      () => {
+        if (selectedMarket) {
+          openMarket(
+            selectedMarket.id
+          );
+        }
+      },
+      2500
+    );
+
+  } catch (error) {
+
+    console.error(
+      "place_bet:",
+      error
+    );
+
+    showToast(
+      error?.message ||
+      String(error),
+      "error"
+    );
+
+  }
+
+};
+
+
+/* =========================================================
+   Resolve market
+========================================================= */
+
+window.resolveMarket = async function() {
+
+  try {
+
+    if (!account) {
+
+      await connectWallet();
+
+    }
+
+    if (!account) {
+
+      throw new Error(
+        "Connect your wallet first."
+      );
+
+    }
+
+    if (!selectedMarket) {
+
+      throw new Error(
+        "No market selected."
+      );
+
+    }
+
+    const deadline =
+      getEpochSeconds(
+        selectedMarket.deadline
+      );
+
+    const now =
+      Math.floor(
+        Date.now() / 1000
+      );
+
+    if (
+      !Number.isFinite(deadline) ||
+      now < deadline
+    ) {
+
+      throw new Error(
+        "The market deadline has not been reached yet."
+      );
+
+    }
+
+    const id =
+      selectedMarket.id;
+
+    const button =
+      document.getElementById(
+        "resolveBtn"
+      );
+
+    if (button) {
+      button.disabled = true;
+      button.textContent =
+        "Resolving...";
+    }
+
+    showToast(
+      "Submitting resolution. Validators will verify the historical evidence...",
+      ""
+    );
+
+    const tx =
+      await callWrite(
+        "resolve_market",
+        [String(id)]
+      );
+
+    console.log(
+      "resolve_market result:",
+      tx
+    );
+
+    showToast(
+      "Resolution submitted.",
+      "success"
+    );
+
+    setTimeout(
+      () => {
+        openMarket(id);
+        loadMarkets();
+      },
+      3500
+    );
+
+  } catch (error) {
+
+    console.error(
+      "resolve_market:",
+      error
+    );
+
+    const button =
+      document.getElementById(
+        "resolveBtn"
+      );
+
+    if (button) {
+      button.disabled = false;
+      button.textContent =
+        "Resolve Market";
+    }
+
+    showToast(
+      error?.message ||
+      String(error),
+      "error"
+    );
+
+  }
+
+};
+
+
+/* =========================================================
+   Claim
+========================================================= */
+
+async function claimMarket() {
+
+  try {
+
+    if (!account) {
+
+      await connectWallet();
+
+    }
+
+    if (!account) {
+
+      throw new Error(
+        "Connect your wallet first."
+      );
+
+    }
+
+    if (!selectedMarket) {
+
+      throw new Error(
+        "No market selected."
+      );
+
+    }
+
+    const id =
+      selectedMarket.id;
+
+    const tx =
+      await callWrite(
+        "claim",
+        [String(id)]
+      );
+
+    console.log(
+      "claim result:",
+      tx
+    );
+
+    showToast(
+      "Claim submitted.",
+      "success"
+    );
+
+  } catch (error) {
+
+    console.error(
+      "claim:",
+      error
+    );
+
+    showToast(
+      error?.message ||
+      String(error),
+      "error"
+    );
+
+  }
+
+}
+
+
+/* =========================================================
+   Resize chart when window changes
+========================================================= */
+
+window.addEventListener(
+  "resize",
+  () => {
+
+    if (!selectedMarket) {
+      return;
+    }
+
+    const canvas =
+      document.getElementById(
+        "marketPriceChart"
+      );
+
+    if (!canvas) {
+      return;
+    }
+
+    /*
+      Reloading the chart also keeps the
+      canvas sharp on resize.
+    */
+
+    loadMarketChart(
+      selectedMarket
+    );
+
+  }
 );
+
+
+/* =========================================================
+   Initial setup
+========================================================= */
+
+function init() {
+
+  const deadline =
+    document.getElementById(
+      "nmDeadline"
+    );
+
+  if (deadline) {
+
+    deadline.value =
+      formatDeadlineInput(
+        new Date(
+          Date.now() +
+          24 * 60 * 60 * 1000
+        )
+      );
+
+  }
+
+  updateQuestionPreview();
+
+  loadMarkets();
+
+}
+
+
+/* =========================================================
+   Modal click outside
+========================================================= */
+
+document
+  .getElementById(
+    "createModal"
+  )
+  .addEventListener(
+    "click",
+    event => {
+
+      if (
+        event.target.id ===
+        "createModal"
+      ) {
+
+        closeCreateModal();
+
+      }
+
+    }
+  );
+
+
+document
+  .getElementById(
+    "detailModal"
+  )
+  .addEventListener(
+    "click",
+    event => {
+
+      if (
+        event.target.id ===
+        "detailModal"
+      ) {
+
+        closeDetailModal();
+
+      }
+
+    }
+  );
+
+
+/* =========================================================
+   Start
+========================================================= */
+
+init();
 
 </script>
 
